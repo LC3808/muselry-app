@@ -95,12 +95,14 @@ final bookmarkedMuseumsProvider = FutureProvider<List<Museum>>((ref) async {
 // ─── 방문 통계 Provider ──────────────────────────────────────────────────────
 /// 방문 기록 기반 통계 데이터 모델.
 class VisitStats {
-  final int totalCount;
+  final int totalCount;              // 총 방문 횟수 (중복 포함)
+  final int distinctMuseumCount;     // 방문한 고유 박물관 수 (P1-2 픽스)
   final Map<String, int> byType;    // 유형별 방문 수
   final Map<String, int> byRegion;  // 지역별 방문 수
 
   const VisitStats({
     required this.totalCount,
+    required this.distinctMuseumCount,
     required this.byType,
     required this.byRegion,
   });
@@ -132,8 +134,11 @@ final visitStatsProvider = Provider<VisitStats?>((ref) {
     }
   }
 
+  final distinctMuseumCount = visits.map((v) => v.museumId).toSet().length;
+
   return VisitStats(
     totalCount: visits.length,
+    distinctMuseumCount: distinctMuseumCount,
     byType: byType,
     byRegion: byRegion,
   );

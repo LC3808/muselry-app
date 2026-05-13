@@ -297,24 +297,33 @@ class _StatsContent extends StatelessWidget {
 
     return Column(
       children: [
-        // 총 방문 수 강조
+        // 총 방문 수 + 고유 박물관 수 (P1-2 픽스)
         Row(
           children: [
             _StatCard(
-              label: '총 방문',
+              label: '총 방문 횟수',
               value: '${s.totalCount}',
               unit: '회',
               color: AppTheme.primaryColor,
             ),
             const SizedBox(width: 12),
             _StatCard(
-              label: '가장 많이 간 유형',
-              value: topTypes.isNotEmpty ? topTypes.first.key : '-',
-              unit: topTypes.isNotEmpty ? '${topTypes.first.value}회' : '',
+              label: '방문한 박물관',
+              value: '${s.distinctMuseumCount}',
+              unit: '곳',
               color: AppTheme.accentColor,
             ),
           ],
         ),
+        if (topTypes.isNotEmpty) ...[  
+          const SizedBox(height: 12),
+          _StatCard(
+            label: '가장 많이 간 유형',
+            value: topTypes.first.key,
+            unit: '${topTypes.first.value}회',
+            color: AppTheme.primaryColor.withValues(alpha: 0.7),
+          ),
+        ],
         if (topRegions.isNotEmpty) ...[
           const SizedBox(height: 12),
           _RegionBar(topRegions: topRegions.take(3).toList()),
