@@ -48,7 +48,8 @@ class AuthService {
   Future<bool> signInWithGoogle() async {
     return await _client.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'io.supabase.museuly://login-callback',
+      redirectTo: 'io.supabase.muselry://login-callback',
+      authScreenLaunchMode: LaunchMode.externalApplication,
     );
   }
 
@@ -59,7 +60,7 @@ class AuthService {
   Future<bool> signInWithApple() async {
     return await _client.auth.signInWithOAuth(
       OAuthProvider.apple,
-      redirectTo: 'io.supabase.museuly://login-callback',
+      redirectTo: 'io.supabase.muselry://login-callback',
     );
   }
 

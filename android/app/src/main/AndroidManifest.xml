@@ -41,7 +41,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="io.supabase.museuly"
+                    android:scheme="io.supabase.muselry"
                     android:host="login-callback" />
             </intent-filter>
         </activity>

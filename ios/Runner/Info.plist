@@ -71,7 +71,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>io.supabase.museuly</string>
+				<string>io.supabase.muselry</string>
 			</array>
 		</dict>
 	</array>
