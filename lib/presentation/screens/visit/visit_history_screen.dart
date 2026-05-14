@@ -1,15 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../domain/models/review.dart';
 import '../../../domain/models/visit.dart';
 import '../../providers/review_provider.dart';
 import '../../providers/visit_provider.dart';
 
-class VisitHistoryScreen extends ConsumerWidget {
+class VisitHistoryScreen extends ConsumerStatefulWidget {
   const VisitHistoryScreen({super.key});
+  @override
+  ConsumerState<VisitHistoryScreen> createState() => _VisitHistoryScreenState();
+}
+
+class _VisitHistoryScreenState extends ConsumerState<VisitHistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 화면 진입 시 강제 새로고침 (리뷰 상태 최신화)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(myVisitsProvider);
+      final visits = ref.read(myVisitsProvider).valueOrNull ?? [];
+      for (final visit in visits) {
+        ref.invalidate(myReviewForVisitProvider(visit.id));
+      }
+    });
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final visitsAsync = ref.watch(myVisitsProvider);
 
     return Scaffold(
@@ -26,7 +45,6 @@ class VisitHistoryScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           // v1.9 이슈 11: 리프레시 시 방문 기록 + 리뷰 캐시 전체 무효화
-          // myReviewForVisitProvider는 family provider이므로 전체 인스턴스를 invalidate하려면 ref.invalidate(인자 없이) 사용
           ref.invalidate(myVisitsProvider);
           ref.invalidate(myReviewsProvider);
           await ref.read(myVisitsProvider.future).catchError((_) => <Visit>[]);
@@ -107,13 +125,12 @@ class _VisitCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final museum = visit.museum;
-    final name = museum?.name ?? '알 수 없는 박물관';
+    final name = museum?.name ?? '(박물관 정보 없음)';
     final type = museum?.type ?? '';
     final region = museum != null ? '${museum.region1} ${museum.region2}' : '';
 
-    // v1.6: 해당 방문에 대한 리뷰 여부 조회
+    // v1.6: 해당 방문에 대한 리뷰 조회 (v1.10: ReviewStatus별 배지 UI)
     final reviewAsync = ref.watch(myReviewForVisitProvider(visit.id));
-    final hasReview = reviewAsync.valueOrNull != null;
     final isReviewLoading = reviewAsync.isLoading;
 
     return Card(
@@ -192,10 +209,7 @@ class _VisitCard extends ConsumerWidget {
                               color: Colors.blueGrey),
                       ],
                     ),
-                    if (visit.rating != null) ...[
-                      const SizedBox(height: 6),
-                      _StarRating(rating: visit.rating!),
-                    ],
+                    // v1.10: 별점은 review에만 표시 (visit.rating 제거)
                     if (visit.privateNote != null &&
                         visit.privateNote!.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -231,7 +245,7 @@ class _VisitCard extends ConsumerWidget {
                 visitId: visit.id,
                 museumId: visit.museumId,
                 museumName: name,
-                hasReview: hasReview,
+                review: reviewAsync.valueOrNull,
                 isLoading: isReviewLoading,
               ),
             ],
@@ -244,7 +258,8 @@ class _VisitCard extends ConsumerWidget {
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
     // v1.7: 리뷰 존재 여부 확인 후 경고 문구 분기 (CASCADE DELETE 정책)
     final reviewAsync = ref.read(myReviewForVisitProvider(visit.id));
-    final hasReview = reviewAsync.valueOrNull != null;
+    final review = reviewAsync.valueOrNull;
+    final hasReview = review != null && review.status != ReviewStatus.removed;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -327,14 +342,14 @@ class _ReviewStatusRow extends StatelessWidget {
   final String visitId;
   final String museumId;
   final String museumName;
-  final bool hasReview;
+  final Review? review;
   final bool isLoading;
 
   const _ReviewStatusRow({
     required this.visitId,
     required this.museumId,
     required this.museumName,
-    required this.hasReview,
+    required this.review,
     required this.isLoading,
   });
 
@@ -360,24 +375,57 @@ class _ReviewStatusRow extends StatelessWidget {
       );
     }
 
+    // v1.10 보완: ReviewStatus별 뱃지 UI 분기
+    final status = review?.status;
+    final hasActiveReview = review != null &&
+        status != ReviewStatus.removed &&
+        status != ReviewStatus.unknown;
+
+    Widget badge;
+    if (status == null ||
+        status == ReviewStatus.removed ||
+        status == ReviewStatus.unknown) {
+      badge = _ReviewBadge(
+        label: '리뷰 미작성',
+        icon: Icons.rate_review_outlined,
+        color: Colors.grey.shade500,
+        backgroundColor: Colors.grey.shade100,
+      );
+    } else if (status == ReviewStatus.published) {
+      badge = _ReviewBadge(
+        label: '리뷰 작성 완료',
+        icon: Icons.check_circle_outline,
+        color: Colors.green.shade600,
+        backgroundColor: Colors.green.shade50,
+      );
+    } else if (status == ReviewStatus.pendingReview) {
+      badge = _ReviewBadge(
+        label: '검토 중',
+        icon: Icons.hourglass_top_outlined,
+        color: Colors.orange.shade600,
+        backgroundColor: Colors.orange.shade50,
+      );
+    } else if (status == ReviewStatus.hidden) {
+      badge = _ReviewBadge(
+        label: '비공개 처리됨',
+        icon: Icons.visibility_off_outlined,
+        color: Colors.grey.shade600,
+        backgroundColor: Colors.grey.shade100,
+      );
+    } else {
+      badge = _ReviewBadge(
+        label: '리뷰 미작성',
+        icon: Icons.rate_review_outlined,
+        color: Colors.grey.shade500,
+        backgroundColor: Colors.grey.shade100,
+      );
+    }
+
     return Row(
       children: [
-        if (hasReview)
-          _ReviewBadge(
-            label: '리뷰 작성 완료',
-            icon: Icons.check_circle_outline,
-            color: Colors.green.shade600,
-            backgroundColor: Colors.green.shade50,
-          )
-        else
-          _ReviewBadge(
-            label: '리뷰 미작성',
-            icon: Icons.rate_review_outlined,
-            color: Colors.grey.shade500,
-            backgroundColor: Colors.grey.shade100,
-          ),
+        badge,
         const Spacer(),
-        if (hasReview)
+        if (hasActiveReview)
           TextButton.icon(
             onPressed: () => context.push(
               '/museum/$museumId/reviews',
@@ -453,28 +501,6 @@ class _ReviewBadge extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── 별점 표시 ─────────────────────────────────────────────────────────────────
-class _StarRating extends StatelessWidget {
-  final double rating;
-  const _StarRating({required this.rating});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(5, (i) {
-        final starValue = (i + 1).toDouble();
-        return Icon(
-          rating >= starValue
-              ? Icons.star
-              : (rating >= starValue - 0.5 ? Icons.star_half : Icons.star_border),
-          size: 16,
-          color: const Color(0xFFE8A87C),
-        );
-      }),
     );
   }
 }

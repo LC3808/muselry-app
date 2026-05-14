@@ -9,6 +9,8 @@ import '../../providers/bookmark_provider.dart';
 import '../../providers/visit_provider.dart';
 import '../../providers/review_provider.dart';
 import '../../../core/errors/auth_required_exception.dart';
+import '../../../core/errors/duplicate_visit_exception.dart';
+import '../museum/visit_add_dialog.dart';
 
 class MuseumDetailScreen extends ConsumerWidget {
   final String museumId;
@@ -494,7 +496,7 @@ class _ActionButtons extends ConsumerWidget {
       final isVisited =
           ref.read(visitedMuseumIdsProvider).contains(museum.id);
       if (isVisited) {
-        // 이미 방문 기록 있음 → 방문 기록 화면으로 이동
+        // 이미 방문 기록 있음 → 안내 메시지
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -505,14 +507,32 @@ class _ActionButtons extends ConsumerWidget {
         }
         return;
       }
-      // 방문 기록 추가 다이얼로그
+      // v1.10: VisitAddDialog로 교체
       if (context.mounted) {
-        await _showAddVisitDialog(context, ref, museum);
+        await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => VisitAddDialog(
+            museumId: museum.id,
+            museumName: museum.name,
+          ),
+        );
       }
     } on AuthRequiredException catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
+        );
+      }
+    } on DuplicateVisitException {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${DateTime.now().year}년 ${DateTime.now().month}월 ${DateTime.now().day}일에 이미 ${museum.name} 방문 기록이 있어요',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -522,205 +542,6 @@ class _ActionButtons extends ConsumerWidget {
         );
       }
     }
-  }
-
-  Future<void> _showAddVisitDialog(
-      BuildContext context, WidgetRef ref, Museum museum) async {
-    DateTime selectedDate = DateTime.now();
-    double? selectedRating;
-    final noteController = TextEditingController();
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 핸들
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '방문 기록 추가',
-                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                museum.name,
-                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-              ),
-              const SizedBox(height: 20),
-              // 날짜 선택
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today_outlined,
-                      size: 18, color: Color(0xFF2C3E50)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '방문 날짜',
-                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => selectedDate = picked);
-                      }
-                    },
-                    child: Text(
-                      '${selectedDate.year}.${selectedDate.month.toString().padLeft(2, "0")}.${selectedDate.day.toString().padLeft(2, "0")}',
-                      style: const TextStyle(
-                        color: Color(0xFFE8A87C),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // 별점 (옵셔널)
-              Row(
-                children: [
-                  const Icon(Icons.star_outline,
-                      size: 18, color: Color(0xFF2C3E50)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '별점 (선택)',
-                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const Spacer(),
-                  ...List.generate(5, (i) {
-                    final starValue = (i + 1).toDouble();
-                    return GestureDetector(
-                      onTap: () => setState(() {
-                        selectedRating =
-                            selectedRating == starValue ? null : starValue;
-                      }),
-                      child: Icon(
-                        (selectedRating != null && selectedRating! >= starValue)
-                            ? Icons.star
-                            : Icons.star_border,
-                        color: const Color(0xFFE8A87C),
-                        size: 28,
-                      ),
-                    );
-                  }),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // 메모 (옵셔널)
-              TextField(
-                controller: noteController,
-                maxLength: 500,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: '방문 메모를 남겨보세요 (선택)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // 저장 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.of(ctx).pop();
-                    try {
-                      await ref.read(myVisitsProvider.notifier).addVisit(
-                            museumId: museum.id,
-                            visitedAt: selectedDate,
-                            rating: selectedRating,
-                            privateNote: noteController.text.trim().isEmpty
-                                ? null
-                                : noteController.text.trim(),
-                          );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('방문 기록이 추가되었습니다! 🎉'),
-                            backgroundColor: Color(0xFF27AE60),
-                          ),
-                        );
-                      }
-                    } on AuthRequiredException catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.message)),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('저장 실패: $e')),
-                        );
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8A87C),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '저장',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    noteController.dispose();
   }
 
   Future<void> _launchDirections(BuildContext context, Museum museum) async {

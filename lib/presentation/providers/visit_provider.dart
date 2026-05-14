@@ -11,7 +11,7 @@ final visitRepositoryProvider = Provider<VisitRepository>((ref) {
 /// 내 방문 기록 전체를 관리하는 AsyncNotifier.
 ///
 /// [낙관적 업데이트 미적용 이유]
-/// visits는 날짜·별점·메모를 입력하는 폼 기반 작업이므로
+/// visits는 날짜·메모를 입력하는 폼 기반 작업이므로
 /// 서버 응답 후 화면에 반영하는 것이 자연스럽다.
 /// 북마크(토글 즉시 반영)와 다른 패턴임을 의도적으로 선택.
 class MyVisitsNotifier extends AsyncNotifier<List<Visit>> {
@@ -22,17 +22,16 @@ class MyVisitsNotifier extends AsyncNotifier<List<Visit>> {
   }
 
   /// 방문 기록 추가 (서버 응답 후 상태 갱신)
+  /// rating 제거 — v1.10 정책: 별점은 review에만
   Future<void> addVisit({
     required String museumId,
     required DateTime visitedAt,
-    double? rating,
     String? privateNote,
   }) async {
     final repo = ref.read(visitRepositoryProvider);
     final newVisit = await repo.addVisit(
       museumId: museumId,
       visitedAt: visitedAt,
-      rating: rating,
       privateNote: privateNote,
     );
     final current = state.valueOrNull ?? [];

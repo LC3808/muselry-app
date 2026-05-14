@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/errors/auth_required_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/repositories/review_repository.dart';
 import '../../../domain/models/review.dart';
 import '../../../domain/models/visit.dart';
@@ -134,17 +135,29 @@ class ReviewScreen extends ConsumerWidget {
                   rating: rating,
                   content: content,
                 );
-            ref
-                .read(museumReviewsProvider(museumId).notifier)
-                .addReview(newReview);
-            ref.invalidate(myReviewsForMuseumProvider(museumId));
-            ref.invalidate(myReviewForVisitProvider(visit.id));
             if (context.mounted) {
               Navigator.pop(context);
               _showStatusSnackBar(context, newReview.status);
             }
+            // v1.10: microtask로 invalidate (build 중 setState 방지)
+            Future.microtask(() {
+              ref
+                  .read(museumReviewsProvider(museumId).notifier)
+                  .addReview(newReview);
+              ref.invalidate(myReviewsForMuseumProvider(museumId));
+              ref.invalidate(myReviewForVisitProvider(visit.id));
+            });
           } on AuthRequiredException {
             if (context.mounted) _showLoginRequired(context);
+          } on PostgrestException catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('서버 오류: ${e.message}'),
+                  backgroundColor: AppTheme.errorColor,
+                ),
+              );
+            }
           } catch (e) {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -189,13 +202,26 @@ class ReviewScreen extends ConsumerWidget {
                   rating: rating,
                   content: content,
                 );
-            ref
-                .read(museumReviewsProvider(museumId).notifier)
-                .updateReview(updated);
-            ref.invalidate(myReviewsForMuseumProvider(museumId));
             if (context.mounted) {
               Navigator.pop(context);
               _showStatusSnackBar(context, updated.status);
+            }
+            // v1.10: microtask로 invalidate (build 중 setState 방지)
+            Future.microtask(() {
+              ref
+                  .read(museumReviewsProvider(museumId).notifier)
+                  .updateReview(updated);
+              ref.invalidate(myReviewsForMuseumProvider(museumId));
+              ref.invalidate(myReviewForVisitProvider(updated.visitId));
+            });
+          } on PostgrestException catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('서버 오류: ${e.message}'),
+                  backgroundColor: AppTheme.errorColor,
+                ),
+              );
             }
           } catch (e) {
             if (context.mounted) {

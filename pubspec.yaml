@@ -33,7 +33,7 @@ dependencies:
 
   # ── 백엔드 / 인증 ──────────────────────────────
   supabase_flutter: ^2.8.4
-  kakao_flutter_sdk_user: ^1.9.7    # 카카오 로그인 SDK (User API만 포함, 경량)
+  kakao_flutter_sdk_user: 1.9.7+3    # 카카오 로그인 SDK (User API만 포함, 경량) — v1.10: 1.10.0 호환성 문제로 1.9.7+3 고정
 
   # ── 상태 관리 ──────────────────────────────────
   flutter_riverpod: ^2.6.1

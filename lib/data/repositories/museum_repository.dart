@@ -78,20 +78,30 @@ class MuseumRepository {
     return Museum.fromJson(response);
   }
 
-  /// 지역 목록 조회
+  /// 지역 목록 조회 (v1.10: 행정구역 순서 고정)
+  static const _regionOrder = [
+    '서울', '경기', '인천',
+    '부산', '대구', '대전', '광주', '울산', '세종',
+    '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주',
+  ];
+
   Future<List<String>> fetchRegions() async {
     final response = await _client
         .from('museums')
         .select('region_1')
         .eq('is_active', true);
 
-    final regions = (response as List)
+    final dbRegions = (response as List)
         .map((e) => e['region_1'] as String)
-        .toSet()
-        .toList()
-      ..sort();
+        .toSet();
 
-    return ['전체', ...regions];
+    // 지정된 순서로 정렬, 목록에 없는 지역은 뒤에 추가
+    final ordered = [
+      ..._regionOrder.where((r) => dbRegions.contains(r)),
+      ...dbRegions.where((r) => !_regionOrder.contains(r)).toList()..sort(),
+    ];
+
+    return ['전체', ...ordered];
   }
 
   /// ID 목록으로 박물관 일괄 조회 (북마크 목록 등에서 사용)

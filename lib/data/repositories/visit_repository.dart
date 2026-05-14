@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/errors/auth_required_exception.dart';
+import '../../core/errors/duplicate_visit_exception.dart';
 import '../../domain/models/visit.dart';
 
 class VisitRepository {
@@ -40,12 +41,11 @@ class VisitRepository {
     return (response as List).map((e) => Visit.fromJson(e)).toList();
   }
 
-  /// 방문 기록 추가
+  /// 방문 기록 추가 (rating 제거 — v1.10 정책: 별점은 review에만)
   /// visited_at은 'yyyy-MM-dd' 문자열로 전송 (DATE 타입 캐스팅 에러 방지)
   Future<Visit> addVisit({
     required String museumId,
     required DateTime visitedAt,
-    double? rating,
     String? privateNote,
   }) async {
     final uid = _requireUserId;
@@ -53,16 +53,24 @@ class VisitRepository {
       'user_id': uid,
       'museum_id': museumId,
       'visited_at': _formatDate(visitedAt),
-      if (rating != null) 'rating': rating,
+      // rating은 항상 NULL (DB 기본값) — v1.10 정책
       if (privateNote != null && privateNote.isNotEmpty)
         'private_note': privateNote,
     };
-    final response = await _client
-        .from('visits')
-        .insert(payload)
-        .select()
-        .single();
-    return Visit.fromJson(response);
+    try {
+      final response = await _client
+          .from('visits')
+          .insert(payload)
+          .select()
+          .single();
+      return Visit.fromJson(response);
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        // UNIQUE 제약 위반 = 같은 날 같은 박물관 중복
+        throw const DuplicateVisitException();
+      }
+      rethrow;
+    }
   }
 
   /// 방문 기록 삭제 (visitId 기준)
