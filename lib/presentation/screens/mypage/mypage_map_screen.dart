@@ -53,6 +53,41 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
   int _selectedVisitCount = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // v1.9 이슈 4: 데이터 변경 감지 리스너 등록
+    // build() 안에서 addPostFrameCallback를 매 프레임 등록하는 패턴 제거
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.listenManual(mapMuseumsProvider, (_, __) => _maybeRefreshMarkers());
+      ref.listenManual(myVisitsProvider, (_, __) => _maybeRefreshMarkers());
+      ref.listenManual(bookmarkedIdsProvider, (_, __) => _maybeRefreshMarkers());
+    });
+  }
+
+  /// 지도가 준비된 경우에만 마커 갱신 (이슈 4 픽스)
+  void _maybeRefreshMarkers() {
+    if (_mapController == null || !mounted) return;
+    final museums = ref.read(mapMuseumsProvider).valueOrNull;
+    if (museums == null) return;
+    final visits = ref.read(myVisitsProvider).valueOrNull ?? [];
+    final bookmarkedIds = ref.read(bookmarkedIdsProvider);
+    final visitedIds = ref.read(visitedMuseumIdsProvider);
+    final visitCountMap = <String, int>{};
+    for (final v in visits) {
+      visitCountMap[v.museumId] = (visitCountMap[v.museumId] ?? 0) + 1;
+    }
+    final filteredVisitIds = _buildFilteredVisitIds(visits);
+    _refreshMarkers(
+      museums: museums,
+      visitedIds: visitedIds,
+      filteredVisitIds: filteredVisitIds,
+      bookmarkedIds: bookmarkedIds,
+      visitCountMap: visitCountMap,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final museumsAsync = ref.watch(mapMuseumsProvider);
     final visits = ref.watch(myVisitsProvider).valueOrNull ?? [];
@@ -101,16 +136,8 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
               onRetry: () => ref.invalidate(mapMuseumsProvider),
             ),
             data: (museums) {
-              // 필터 적용 후 마커 갱신
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _refreshMarkers(
-                  museums: museums,
-                  visitedIds: visitedIds,
-                  filteredVisitIds: filteredVisitIds,
-                  bookmarkedIds: bookmarkedIds,
-                  visitCountMap: visitCountMap,
-                );
-              });
+              // v1.9 이슈 4: build() 내 addPostFrameCallback 제거
+              // 마커 갱신은 onMapReady + listenManual에서만 수행
               return NaverMap(
                 options: const NaverMapViewOptions(
                   initialCameraPosition: NCameraPosition(

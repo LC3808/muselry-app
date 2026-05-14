@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../config/router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/museum.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/museum_provider.dart';
+import '../../providers/profile_provider.dart';
 
 /// 홈 화면 (Day 9 업데이트)
 /// - 인기 박물관 가로 스크롤 섹션 추가 (museum_ranking 기준, 폴백: average_rating)
@@ -16,8 +16,8 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
     final popularAsync = ref.watch(popularMuseumsProvider);
+    final displayName = ref.watch(displayNameProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -42,7 +42,7 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── 인사말 배너 ──────────────────────────────────────────
-                _GreetingBanner(userEmail: user?.email),
+                _GreetingBanner(displayName: displayName),
                 const SizedBox(height: 24),
 
                 // ── 빠른 탐색 ────────────────────────────────────────────
@@ -65,7 +65,7 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     _QuickAccessCard(
                       emoji: '🔍',
-                      label: '박물관 탐색',
+                      label: '전시 공간 탐색',
                       color: const Color(0xFF3498DB),
                       onTap: () => context.go(AppRoutes.explore),
                     ),
@@ -146,8 +146,8 @@ class HomeScreen extends ConsumerWidget {
 // ─── 인사말 배너 ──────────────────────────────────────────────────────────────
 
 class _GreetingBanner extends StatelessWidget {
-  final String? userEmail;
-  const _GreetingBanner({this.userEmail});
+  final String displayName;
+  const _GreetingBanner({required this.displayName});
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +170,7 @@ class _GreetingBanner extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            userEmail ?? '사용자',
+            displayName,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,

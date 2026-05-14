@@ -102,16 +102,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     await _mapController!.addOverlayAll(markers);
   }
 
+  // v1.9: 기념관/전시관 제외
   Color _typeColor(String? type) {
     switch (type) {
       case '박물관':
         return _kGold;
       case '미술관':
         return const Color(0xFF7C4DFF);
-      case '기념관':
-        return const Color(0xFF00897B);
-      case '전시관':
-        return const Color(0xFF1565C0);
       case '과학관':
         return const Color(0xFFE65100);
       default:
@@ -270,11 +267,10 @@ class _TypeLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // v1.9: 기념관/전시관 제외
     const items = [
       ('박물관', _kGold),
       ('미술관', Color(0xFF7C4DFF)),
-      ('기념관', Color(0xFF00897B)),
-      ('전시관', Color(0xFF1565C0)),
       ('과학관', Color(0xFFE65100)),
     ];
 

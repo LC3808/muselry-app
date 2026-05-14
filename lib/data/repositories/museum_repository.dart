@@ -12,6 +12,8 @@ class MuseumRepository {
     /// 운영 필터: '공공' = 국립+공립, '민간' = 사립+대학+기업 (v1.8)
     String? ownership,
     bool? isKidsFriendly,
+    /// 무료 관람 필터 (v1.9 이슈 7): true이면 is_free=true 조건 추가
+    bool? isFree,
     int limit = 20,
     int offset = 0,
   }) async {
@@ -50,6 +52,11 @@ class MuseumRepository {
     // Day 9: 어린이 친화 필터
     if (isKidsFriendly == true) {
       query = query.eq('is_kids_friendly', true);
+    }
+
+    // v1.9: 무료 관람 필터 (is_free 콼럼 기반)
+    if (isFree == true) {
+      query = query.eq('is_free', true);
     }
 
     final response = await query
@@ -105,34 +112,18 @@ class MuseumRepository {
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 
-  /// 인기 박물관 조회 (museum_ranking 기준, 폴백: average_rating)
+  /// 인기 박물관 조회 (v1.9 이슈 3: 정적 랭킹 우선, NULL은 average_rating 기준 후순위)
   ///
-  /// museum_ranking 테이블이 없거나 비어 있으면 average_rating 기준으로 폴백.
+  /// 정렬 우선순위:
+  ///   1. static_popularity_rank ASC (NULL last) — 통계청 방문객 기반 정적 순위
+  ///   2. average_rating DESC (NULL last) — 리뷰 평점 기반 폴백
   Future<List<Museum>> fetchPopularMuseums({int limit = 10}) async {
-    try {
-      // museum_ranking JOIN
-      final response = await _client
-          .from('museum_ranking')
-          .select('museum_id, bayesian_score, museums!inner(*)')
-          .order('bayesian_score', ascending: false)
-          .limit(limit);
-      final list = response as List;
-      if (list.isNotEmpty) {
-        return list
-            .map((e) => Museum.fromJson(e['museums'] as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (_) {
-      // museum_ranking 테이블 없거나 조인 실패 시 폴백
-    }
-    // 폴백: average_rating 기준 정렬
     final response = await _client
         .from('museums')
         .select()
         .eq('is_active', true)
-        .not('average_rating', 'is', null)
-        .order('average_rating', ascending: false)
-        .order('review_count', ascending: false)
+        .order('static_popularity_rank', ascending: true, nullsFirst: false)
+        .order('average_rating', ascending: false, nullsFirst: false)
         .limit(limit);
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }

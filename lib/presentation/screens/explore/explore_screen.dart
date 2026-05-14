@@ -20,8 +20,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   // C4 수정: 검색 디바운싱 타이머 (350ms)
   Timer? _searchDebounce;
 
-  // v1.8: 유형 필터 (museums.type 기준)
-  static const _typeFilters = ['전체', '박물관', '미술관', '과학관', '기념관', '전시관'];
+  // v1.9: 유형 필터 (기념관/전시관 제외)
+  static const _typeFilters = ['전체', '박물관', '미술관', '과학관'];
   // v1.8: 운영 필터 (공공=국립+공립, 민간=사립+대학+기업)
   static const _ownershipFilters = ['전체', '공공', '민간'];
 
@@ -44,6 +44,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           type: filter.selectedType == '전체' ? null : filter.selectedType,
           ownership: filter.selectedOwnership == '전체' ? null : filter.selectedOwnership,
           isKidsFriendly: filter.isKidsFriendly ? true : null,
+          isFree: filter.isFree ? true : null,
         );
   }
 
@@ -59,6 +60,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             type: filter.selectedType == '전체' ? null : filter.selectedType,
             ownership: filter.selectedOwnership == '전체' ? null : filter.selectedOwnership,
             isKidsFriendly: filter.isKidsFriendly ? true : null,
+            isFree: filter.isFree ? true : null,
           );
     }
   }
@@ -107,7 +109,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             pinned: false,
             backgroundColor: theme.scaffoldBackgroundColor,
             elevation: 0,
-            expandedHeight: 120,
+            expandedHeight: 132,
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 60, 16, 8),
@@ -198,6 +200,37 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                           side: BorderSide(
                             color: filter.isKidsFriendly
                                 ? const Color(0xFF27AE60)
+                                : Colors.grey[300]!,
+                          ),
+                        ),
+                        backgroundColor: Colors.transparent,
+                        showCheckmark: false,
+                      ),
+                      // v1.9 이슈 7: 무료 관람 태그
+                      FilterChip(
+                        label: const Text('무료 관람'),
+                        avatar: const Text('🆓', style: TextStyle(fontSize: 14)),
+                        selected: filter.isFree,
+                        onSelected: (val) {
+                          ref.read(exploreFilterProvider.notifier).setFree(val);
+                          _onFilterChanged();
+                        },
+                        selectedColor: const Color(0xFF3498DB).withValues(alpha: 0.15),
+                        checkmarkColor: const Color(0xFF3498DB),
+                        labelStyle: TextStyle(
+                          color: filter.isFree
+                              ? const Color(0xFF3498DB)
+                              : Colors.grey[600],
+                          fontSize: 13,
+                          fontWeight: filter.isFree
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: filter.isFree
+                                ? const Color(0xFF3498DB)
                                 : Colors.grey[300]!,
                           ),
                         ),

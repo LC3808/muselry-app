@@ -75,7 +75,7 @@ class ReviewScreen extends ConsumerWidget {
                       ? () => _showEditBottomSheet(context, ref, review)
                       : null,
                   onDelete: isMyReview
-                      ? () => _showDeleteDialog(context, ref, review.id)
+                      ? () => _showDeleteDialog(context, ref, review)
                       : null,
                   onReport: !isMyReview && currentUser != null
                       ? () => _showReportDialog(context, ref, review.id)
@@ -214,8 +214,9 @@ class ReviewScreen extends ConsumerWidget {
 
   // ── 삭제 확인 다이얼로그 ─────────────────────────────────────────────────
 
+  // v1.9 이슈 5: Review 객체를 받아 visitId로 myReviewForVisitProvider도 invalidate
   void _showDeleteDialog(
-      BuildContext context, WidgetRef ref, String reviewId) {
+      BuildContext context, WidgetRef ref, Review review) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -232,11 +233,13 @@ class ReviewScreen extends ConsumerWidget {
               try {
                 await ref
                     .read(myReviewsProvider.notifier)
-                    .deleteReview(reviewId);
+                    .deleteReview(review.id);
                 ref
                     .read(museumReviewsProvider(museumId).notifier)
-                    .removeReview(reviewId);
+                    .removeReview(review.id);
                 ref.invalidate(myReviewsForMuseumProvider(museumId));
+                // v1.9 이슈 5: 삭제 후 해당 방문 리뷰 캐시도 무효화
+                ref.invalidate(myReviewForVisitProvider(review.visitId));
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('리뷰가 삭제되었습니다.')),

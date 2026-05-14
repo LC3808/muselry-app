@@ -20,9 +20,15 @@ class KoreanContentFilter {
     '조선족', '짱깨', '쪽바리', '흑형', '장애인들은', '노인네들은',
   ];
 
-  static const List<String> _spamPatterns = [
-    'http://', 'https://', 'www.',
-    '010-', '010 ', '02-', '031-', '032-',
+  // v1.9 이슈 10: 단순 substring 대신 정규식 기반 스팸 필터
+  // 이유: '02-', '031-' 등이 일반 리덼 텍스트를 오탐으로 차단하는 문제 해결
+  static final List<RegExp> _spamRegexPatterns = [
+    // URL 형식 (example.com, test.co.kr 등)
+    RegExp(r'[a-z0-9-]+\.(com|net|org|kr|co\.kr|co|io|app)\b', caseSensitive: false),
+    // 전화번호 형식 (000-0000-0000)
+    RegExp(r'\d{2,3}-\d{3,4}-\d{4}'),
+    // 카카오톡 ID 형식
+    RegExp(r'(?:카톡|카카오톡|kakao)\s*[::：]?\s*[a-z0-9_]{4,}', caseSensitive: false),
   ];
 
   /// 텍스트가 필터링 대상인지 확인.
@@ -33,10 +39,10 @@ class KoreanContentFilter {
       if (lower.contains(kw)) return '부적절한 표현이 포함되어 있습니다.';
     }
     for (final kw in _hateKeywords) {
-      if (lower.contains(kw)) return '혐오 표현이 포함되어 있습니다.';
+      if (lower.contains(kw)) return '혁오 표현이 포함되어 있습니다.';
     }
-    for (final pattern in _spamPatterns) {
-      if (lower.contains(pattern)) return 'URL 또는 전화번호가 포함되어 있습니다.';
+    for (final regex in _spamRegexPatterns) {
+      if (regex.hasMatch(text)) return '광고성 콘텐츠가 의심됩니다.';
     }
     return null;
   }

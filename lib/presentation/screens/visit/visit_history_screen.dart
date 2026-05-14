@@ -23,16 +23,33 @@ class VisitHistoryScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      body: visitsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
-          error: e.toString(),
-          onRetry: () => ref.invalidate(myVisitsProvider),
-        ),
-        data: (visits) {
-          if (visits.isEmpty) return const _EmptyView();
-          return _VisitList(visits: visits);
+      body: RefreshIndicator(
+        onRefresh: () async {
+          // v1.9 이슈 11: 리프레시 시 방문 기록 + 리뷰 캐시 전체 무효화
+          // myReviewForVisitProvider는 family provider이므로 전체 인스턴스를 invalidate하려면 ref.invalidate(인자 없이) 사용
+          ref.invalidate(myVisitsProvider);
+          ref.invalidate(myReviewsProvider);
+          await ref.read(myVisitsProvider.future).catchError((_) => <Visit>[]);
         },
+        child: visitsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => ListView(
+            children: [
+              _ErrorView(
+                error: e.toString(),
+                onRetry: () => ref.invalidate(myVisitsProvider),
+              ),
+            ],
+          ),
+          data: (visits) {
+            if (visits.isEmpty) {
+              return ListView(
+                children: const [_EmptyView()],
+              );
+            }
+            return _VisitList(visits: visits);
+          },
+        ),
       ),
     );
   }
