@@ -89,7 +89,7 @@ class ReviewRepository {
     if (uid == null) return [];
     final response = await _client
         .from('reviews')
-        .select('*, museums(id, name, type, thumbnail_url, region_1)')
+        .select('*, museums(id, name, type, image_url, region_1)')
         .eq('user_id', uid)
         .inFilter('status', ['published', 'pending_review'])
         .order('created_at', ascending: false);
@@ -241,15 +241,15 @@ class ReviewRepository {
     final from = page * pageSize;
     final to = from + pageSize - 1;
     final data = await _client
-        .from('reviews')
-        .select(
-          'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, '
-          'profiles!user_id(nickname, avatar_url), '
-          'museums!museum_id(name, thumbnail_url)',
-        )
-        .eq('status', 'published')
-        .order('created_at', ascending: false)
-        .range(from, to);
+      .from('reviews')
+      .select(
+        'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, '
+        'profiles!user_id(nickname, avatar_url), '
+        'museums!museum_id(id, name, region_1, image_url)',
+      )
+      .eq('status', 'published')
+      .order('created_at', ascending: false)
+      .range(from, to);
     return (data as List).map((e) => Review.fromJson(e)).toList();
   }
 

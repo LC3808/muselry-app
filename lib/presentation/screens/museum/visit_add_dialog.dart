@@ -48,7 +48,7 @@ class _VisitAddDialogState extends ConsumerState<VisitAddDialog> {
     }
   }
 
-  Future<void> _submit() async {
+    Future<void> _submit() async {
     setState(() => _isSubmitting = true);
     try {
       await ref.read(myVisitsProvider.notifier).addVisit(
@@ -59,19 +59,25 @@ class _VisitAddDialogState extends ConsumerState<VisitAddDialog> {
             : _memoController.text.trim(),
       );
       if (!mounted) return;
+
+      // pop 전에 부모 context를 미리 캡처 (Navigator.pop 후에는 다이얼로그의 context가 무효화됨)
+      final rootContext = Navigator.of(context, rootNavigator: true).context;
+      final museumId = widget.museumId;
+      final museumName = widget.museumName;
+
       Navigator.pop(context);
-      // SnackBar에 "리뷰 쓰기" 액션
-      ScaffoldMessenger.of(context).showSnackBar(
+
+      // 부모 Scaffold의 ScaffoldMessenger 사용 (다이얼로그가 닫혀도 유효)
+      ScaffoldMessenger.of(rootContext).showSnackBar(
         SnackBar(
           content: const Text('방문이 기록되었습니다.'),
           duration: const Duration(seconds: 5),
           action: SnackBarAction(
             label: '리뷰 쓰기',
             onPressed: () {
-              // 방금 추가한 visit의 ID를 가져와서 리뷰 화면으로
-              context.push(
-                '/museum/${widget.museumId}/reviews',
-                extra: {'museumName': widget.museumName},
+              // 부모 context로 GoRouter navigation (museumName을 query 파라미터로 전달)
+              rootContext.push(
+                '/museum/$museumId/reviews?name=${Uri.encodeComponent(museumName)}',
               );
             },
           ),

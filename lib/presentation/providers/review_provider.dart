@@ -224,20 +224,20 @@ class CommunityReviewsNotifier extends Notifier<CommunityReviewsState> {
 
   /// 첫 페이지 로드 (pull-to-refresh 포함)
   Future<void> fetchInitial() async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      final repo = ref.read(reviewRepositoryProvider);
-      final reviews = await repo.fetchCommunityReviews(page: 0);
-      state = CommunityReviewsState(
-        reviews: reviews,
-        isLoading: false,
-        hasMore: reviews.length >= 20,
-        currentPage: 0,
-      );
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: true, error: null);
+      try {
+        final repo = ref.read(reviewRepositoryProvider);
+        final reviews = await repo.fetchCommunityReviews(page: 0);
+        state = CommunityReviewsState(
+          reviews: reviews,
+          isLoading: false,
+          hasMore: reviews.length >= 20,
+          currentPage: 0,
+        );
+      } catch (e) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
     }
-  }
 
   /// 다음 페이지 로드 (무한 스크롤)
   Future<void> fetchMore() async {

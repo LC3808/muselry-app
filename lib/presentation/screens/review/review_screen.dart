@@ -928,7 +928,8 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
   late TextEditingController _contentController;
   bool _isSubmitting = false;
   String? _filterError;
-  static const int _maxLength = 500;
+  static const int _minLength = 10;  // DB reviews_content_check 제약과 일치
+  static const int _maxLength = 500; // DB reviews_content_check 제약과 일치
 
   @override
   void initState() {
@@ -950,25 +951,29 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
   }
 
   Future<void> _submit() async {
-    final content = _contentController.text.trim();
-    if (content.isEmpty) {
-      setState(() => _filterError = '리뷰 내용을 입력해 주세요.');
-      return;
-    }
-    if (content.length > _maxLength) {
-      setState(() => _filterError = '리뷰는 $_maxLength자 이내로 작성해 주세요.');
-      return;
-    }
-    setState(() {
-      _isSubmitting = true;
-      _filterError = null;
-    });
-    try {
-      await widget.onSubmit(_rating, content);
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
+  final content = _contentController.text.trim();
+  if (content.isEmpty) {
+    setState(() => _filterError = '리뷰 내용을 입력해 주세요.');
+    return;
   }
+  if (content.length < _minLength) {
+    setState(() => _filterError = '리뷰는 $_minLength자 이상 작성해 주세요. (현재 ${content.length}자)');
+    return;
+  }
+  if (content.length > _maxLength) {
+    setState(() => _filterError = '리뷰는 $_maxLength자 이내로 작성해 주세요.');
+    return;
+  }
+  setState(() {
+    _isSubmitting = true;
+    _filterError = null;
+  });
+  try {
+    await widget.onSubmit(_rating, content);
+  } finally {
+    if (mounted) setState(() => _isSubmitting = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1076,7 +1081,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
               maxLength: _maxLength,
               onChanged: _onContentChanged,
               decoration: InputDecoration(
-                hintText: '방문 경험을 솔직하게 작성해 주세요. (최대 $_maxLength자)',
+                hintText: '방문 경험을 솔직하게 작성해 주세요. ($_minLength~$_maxLength자)',
                 counterText: '',
                 errorText: _filterError,
               ),
@@ -1118,29 +1123,41 @@ class _RatingSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        ...List.generate(5, (i) {
-          return GestureDetector(
+        // 별 5개를 하나의 GestureDetector로 감싸기
+        Builder(
+          builder: (ctx) => GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTapDown: (details) {
-              final box = context.findRenderObject() as RenderBox?;
+              final box = ctx.findRenderObject() as RenderBox?;
               if (box == null) return;
-              final starWidth = box.size.width / 5;
-              final tapX = details.localPosition.dx;
-              final starIndex = (tapX / starWidth).floor();
-              final withinStar = tapX - starIndex * starWidth;
-              final newRating = withinStar < starWidth / 2
-                  ? starIndex + 0.5
-                  : starIndex + 1.0;
+              final totalWidth = box.size.width;
+              final starWidth = totalWidth / 5;
+              final tapX = details.localPosition.dx.clamp(0.0, totalWidth);
+              final starIndex = (tapX / starWidth).floor().clamp(0, 4);
+              final withinStar = tapX - (starIndex * starWidth);
+              final isLeftHalf = withinStar < starWidth * 0.5;
+              final newRating = isLeftHalf
+                  ? (starIndex + 0.5)
+                  : (starIndex + 1.0);
               onChanged(newRating.clamp(0.5, 5.0));
             },
-            child: Icon(
-              i < rating.floor()
-                  ? Icons.star
-                  : (i < rating ? Icons.star_half : Icons.star_border),
-              size: 36,
-              color: AppTheme.accentColor,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(5, (i) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                  child: Icon(
+                    i < rating.floor()
+                        ? Icons.star
+                        : (i < rating ? Icons.star_half : Icons.star_border),
+                    size: 36,
+                    color: AppTheme.accentColor,
+                  ),
+                );
+              }),
             ),
-          );
-        }),
+          ),
+        ),
         const SizedBox(width: 8),
         Text(
           '${rating.toStringAsFixed(1)}점',
@@ -1154,7 +1171,6 @@ class _RatingSelector extends StatelessWidget {
     );
   }
 }
-
 // ─── 빈 상태 ────────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
