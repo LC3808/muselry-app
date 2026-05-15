@@ -30,10 +30,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # ── 백엔드 / 인증 ──────────────────────────────
   supabase_flutter: ^2.8.4
-  kakao_flutter_sdk_user: 1.9.7+3    # 카카오 로그인 SDK (User API만 포함, 경량) — v1.10: 1.10.0 호환성 문제로 1.9.7+3 고정
+  kakao_flutter_sdk_user: 1.9.7+3    # Flutter 3.32 호환: 1.10.0의 widget_previews import 회피
 
   # ── 상태 관리 ──────────────────────────────────
   flutter_riverpod: ^2.6.1
@@ -60,7 +62,7 @@ dependencies:
   url_launcher: ^6.3.1
 
   # ── 유틸리티 ──────────────────────────────────
-  intl: ^0.19.0
+  intl: ^0.20.2
   shared_preferences: ^2.3.5
   # W8 수정: image_picker 미사용으로 제거 (Day 6 프로필 이미지 기능 구현 시 재추가)
   permission_handler: ^11.3.1
