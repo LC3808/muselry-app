@@ -9,7 +9,7 @@ import '../../providers/museum_provider.dart';
 import '../../providers/profile_provider.dart';
 
 /// 홈 화면 (Day 9 업데이트)
-/// - 인기 박물관 가로 스크롤 섹션 추가 (museum_ranking 기준, 폴백: average_rating)
+/// - 인기 장소 가로 스크롤 섹션 추가 (museum_ranking 기준, 폴백: average_rating)
 /// - 빠른 탐색 그리드 유지
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -91,12 +91,12 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 32),
 
-                // ── 인기 박물관 섹션 ─────────────────────────────────────
+                // ── 인기 장소 섹션 ─────────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '🏆 인기 박물관',
+                      '🏆 인기 장소',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -193,7 +193,7 @@ class _GreetingBanner extends StatelessWidget {
   }
 }
 
-// ─── 인기 박물관 가로 스크롤 리스트 ──────────────────────────────────────────
+// ─── 인기 장소 가로 스크롤 리스트 ──────────────────────────────────────────
 
 class _PopularMuseumsList extends StatelessWidget {
   final List<Museum> museums;
@@ -429,7 +429,7 @@ class _PopularMuseumsError extends StatelessWidget {
       child: TextButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.refresh, size: 16),
-        label: const Text('인기 박물관을 불러오지 못했어요. 다시 시도'),
+        label: const Text('인기 장소를 불러오지 못했어요. 다시 시도'),
         style: TextButton.styleFrom(
           foregroundColor: AppTheme.textSecondaryColor,
         ),
@@ -445,7 +445,7 @@ class _PopularMuseumsEmpty extends StatelessWidget {
       height: 80,
       alignment: Alignment.center,
       child: Text(
-        '아직 인기 박물관 데이터가 없어요.',
+        '아직 인기 장소 데이터가 없어요.',
         style: TextStyle(
           fontSize: 13,
           color: AppTheme.textSecondaryColor,

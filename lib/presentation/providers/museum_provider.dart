@@ -230,7 +230,7 @@ final mapMuseumsProvider = FutureProvider<List<Museum>>((ref) async {
   return repo.fetchAllForMap();
 });
 
-// ─── 인기 박물관 Provider (Day 9) ─────────────────────────────────────────
+// ─── 인기 장소 Provider (Day 9) ─────────────────────────────────────────
 final popularMuseumsProvider = FutureProvider<List<Museum>>((ref) async {
   final repo = ref.read(museumRepositoryProvider);
   return repo.fetchPopularMuseums(limit: 10);

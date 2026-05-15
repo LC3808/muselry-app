@@ -61,7 +61,7 @@ class VisitRepository {
       final response = await _client
           .from('visits')
           .insert(payload)
-          .select()
+          .select('*, museums(*)')
           .single();
       return Visit.fromJson(response);
     } on PostgrestException catch (e) {

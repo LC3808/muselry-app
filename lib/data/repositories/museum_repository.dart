@@ -122,7 +122,7 @@ class MuseumRepository {
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 
-  /// 인기 박물관 조회 (v1.9 이슈 3: 정적 랭킹 우선, NULL은 average_rating 기준 후순위)
+  /// 인기 장소 조회 (v1.9 이슈 3: 정적 랜킹 우선, NULL은 average_rating 기준 후순위)
   ///
   /// 정렬 우선순위:
   ///   1. static_popularity_rank ASC (NULL last) — 통계청 방문객 기반 정적 순위

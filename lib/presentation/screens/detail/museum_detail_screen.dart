@@ -464,12 +464,10 @@ class _ActionButtons extends ConsumerWidget {
             Expanded(
               child: _ActionButton(
                 icon: isVisited
-                    ? Icons.check_circle
+                    ? Icons.add_location_alt
                     : Icons.check_circle_outline,
-                label: isVisited ? '방문 완료' : '다녀왔어요',
-                color: isVisited
-                    ? const Color(0xFF27AE60)
-                    : const Color(0xFFE8A87C),
+                label: isVisited ? '또 다녀왔어요' : '다녀왔어요',
+                color: const Color(0xFFE8A87C),
                 onTap: () => _onVisitTap(context, ref, museum),
               ),
             ),
@@ -493,21 +491,8 @@ class _ActionButtons extends ConsumerWidget {
   Future<void> _onVisitTap(
       BuildContext context, WidgetRef ref, Museum museum) async {
     try {
-      final isVisited =
-          ref.read(visitedMuseumIdsProvider).contains(museum.id);
-      if (isVisited) {
-        // 이미 방문 기록 있음 → 안내 메시지
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('이미 방문 기록이 있습니다. 방문 기록 화면에서 관리하세요.'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-        return;
-      }
-      // v1.10: VisitAddDialog로 교체
+      // v1.10: 기존 방문 여부 사전 차단 제거 — 항상 VisitAddDialog를 열고
+      // 같은 날 중복은 DB unique index / DuplicateVisitException으로 처리
       if (context.mounted) {
         await showModalBottomSheet(
           context: context,
