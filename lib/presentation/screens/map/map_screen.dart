@@ -21,7 +21,7 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   NaverMapController? _mapController;
   NLatLng _initialPosition = const NLatLng(37.5665, 126.9780);
-  bool _markersAdded = false;
+  int _lastDrawnCount = -1;
 
   @override
   void initState() {
@@ -36,7 +36,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.deniedForever ||
-          perm == LocationPermission.denied) { return; }
+          perm == LocationPermission.denied) {
+        return;
+      }
 
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -56,23 +58,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _onMapReady(NaverMapController controller) {
     _mapController = controller;
-    // C3 수정: 지도 준비 완료 시점에 이미 로드된 데이터 있으면 마커 추가
     final museumsAsync = ref.read(mapMuseumsProvider);
     museumsAsync.whenData((museums) => _addMuseumMarkers(museums));
   }
 
-  // C3 수정: 데이터 로드 완료 후 지도가 준비된 경우 마커 추가
-  // build()에서 addPostFrameCallback를 매 프레임 등록하는 패턴 제거
   void _onMuseumsLoaded(List<Museum> museums) {
-    if (_mapController != null) {
+    if (_mapController != null && museums.length != _lastDrawnCount) {
       _addMuseumMarkers(museums);
     }
-    // 지도가 아직 준비 안 된 경우 _onMapReady에서 처리됨
   }
 
   Future<void> _addMuseumMarkers(List<Museum> museums) async {
-    if (_mapController == null || _markersAdded) return;
-    _markersAdded = true;
+    if (_mapController == null) return;
+
+    await _mapController!.clearOverlays();
+    _lastDrawnCount = museums.length;
+
+    if (museums.isEmpty) return;
 
     final Set<NMarker> markers = {};
     for (final museum in museums) {
@@ -102,13 +104,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     await _mapController!.addOverlayAll(markers);
   }
 
-  // v1.9: 기념관/전시관 제외
   Color _typeColor(String? type) {
     switch (type) {
       case '박물관':
         return _kGold;
       case '미술관':
         return const Color(0xFF7C4DFF);
+      case '기념관':
+        return const Color(0xFF00897B);
+      case '전시관':
+        return const Color(0xFF1565C0);
       case '과학관':
         return const Color(0xFFE65100);
       default:
@@ -134,26 +139,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
             onMapReady: _onMapReady,
           ),
-
-          // 상단 검색 바
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 16,
             right: 16,
             child: _SearchBarTile(onTap: () => context.go('/explore')),
           ),
-
-          // 유형 범례
           Positioned(
             top: MediaQuery.of(context).padding.top + 68,
             right: 16,
             child: const _TypeLegend(),
           ),
-
-          // 하단 개수 배지
           museumsAsync.when(
             data: (museums) {
-              // C3 수정: addPostFrameCallback 제거 — _onMapReady 및 _onMuseumsLoaded에서 일괄 처리
               _onMuseumsLoaded(museums);
               return Positioned(
                 bottom: 24,
@@ -220,7 +218,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 }
 
-// ── 상단 검색 바 ──────────────────────────────────────────────────────────────
 class _SearchBarTile extends StatelessWidget {
   final VoidCallback onTap;
   const _SearchBarTile({required this.onTap});
@@ -261,13 +258,11 @@ class _SearchBarTile extends StatelessWidget {
   }
 }
 
-// ── 유형 범례 ─────────────────────────────────────────────────────────────────
 class _TypeLegend extends StatelessWidget {
   const _TypeLegend();
 
   @override
   Widget build(BuildContext context) {
-    // v1.9: 기념관/전시관 제외
     const items = [
       ('박물관', _kGold),
       ('미술관', Color(0xFF7C4DFF)),
@@ -317,7 +312,6 @@ class _TypeLegend extends StatelessWidget {
   }
 }
 
-// ── 하단 개수 배지 ────────────────────────────────────────────────────────────
 class _CountBadge extends StatelessWidget {
   final int count;
   const _CountBadge({required this.count});

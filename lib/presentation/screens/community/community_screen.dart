@@ -219,13 +219,13 @@ class _ReviewFeedCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            review.authorNickname ?? '익명',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
+                                _maskNickname(review.authorNickname),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimaryColor,
+                                ),
+                              ),
                           Text(
                             _formatDate(review.createdAt),
                             style: const TextStyle(
@@ -260,6 +260,27 @@ class _ReviewFeedCard extends StatelessWidget {
     );
   }
 
+  /// 닉네임 또는 이메일 마스킹
+  /// - 일반 닉네임: 앞 2글자 노출 + 나머지 ** (예: 자유잍튜브THE → 자유****)
+  /// - 1~2글자 닉네임: 그대로 표시
+  /// - 이메일 형식: @ 앞 2글자 노출 + ** + @이후 도메인 유지 (예: ab****@naver.com)
+  /// - null/빈 문자열: '익명'
+  static String _maskNickname(String? nickname) {
+    if (nickname == null || nickname.isEmpty) return '익명';
+
+    // 이메일 형식 감지
+    if (nickname.contains('@')) {
+      final parts = nickname.split('@');
+      final local = parts[0];
+      final domain = parts.length > 1 ? '@${parts[1]}' : '';
+      if (local.length <= 2) return '$local****$domain';
+      return '${local.substring(0, 2)}****$domain';
+    }
+
+    // 일반 닉네임
+    if (nickname.length <= 2) return nickname;
+    return '${nickname.substring(0, 2)}${'*' * (nickname.length - 2).clamp(2, 6)}';
+  }
   String _formatDate(DateTime dt) {
     final now = DateTime.now();
     final diff = now.difference(dt);

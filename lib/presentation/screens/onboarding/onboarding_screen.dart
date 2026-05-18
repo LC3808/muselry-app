@@ -20,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingPage(
       emoji: '🏛️',
       title: '전국 박물관·미술관을\n한눈에',
-      description: '공공데이터 기반으로 전국 수천 곳의\n박물관과 미술관 정보를 제공합니다.\n검색, 필터, 지도로 쉽게 찾아보세요.',
+      description: '전국 수천 곳의\n박물관과 미술관 정보를 제공합니다.\n검색, 필터, 지도로 쉽게 찾아보세요.',
       backgroundColor: Color(0xFF2C3E50),
     ),
     _OnboardingPage(
