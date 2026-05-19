@@ -65,6 +65,13 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    // dispose 시 controller 참조 해제 — 늦게 도착한 async 작업이 무효화된 controller를 건드리지 않도록
+    _mapController = null;
+    super.dispose();
+  }
+
   /// 지도가 준비된 경우에만 마커 갱신 (이슈 4 픽스)
   void _maybeRefreshMarkers() {
     if (_mapController == null || !mounted) return;
