@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart';
 
-import '../../../domain/models/museum.dart';
 import '../../providers/museum_provider.dart';
+import 'widgets/unified_museum_map_view.dart';
 
 // 앱 색상 상수
 const _kNavy = Color(0xFF2C3E50);
-const _kGold = Color(0xFFB8860B);
 
+/// 지도 탭 화면.
+///
+/// overlay 관리는 [UnifiedMuseumMapView]에 위임한다.
+/// 이 화면은 데이터를 조회하여 props로 전달하는 wrapper 역할만 한다.
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -19,9 +22,7 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
-  NaverMapController? _mapController;
   NLatLng _initialPosition = const NLatLng(37.5665, 126.9780);
-  int _lastDrawnCount = -1;
 
   @override
   void initState() {
@@ -48,76 +49,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
       if (!mounted) return;
       setState(() => _initialPosition = NLatLng(pos.latitude, pos.longitude));
-      _mapController?.updateCamera(
-        NCameraUpdate.withParams(target: _initialPosition, zoom: 13),
-      );
     } catch (_) {
       // 위치 실패 시 서울 기본값 유지
-    }
-  }
-
-  void _onMapReady(NaverMapController controller) {
-    _mapController = controller;
-    final museumsAsync = ref.read(mapMuseumsProvider);
-    museumsAsync.whenData((museums) => _addMuseumMarkers(museums));
-  }
-
-  void _onMuseumsLoaded(List<Museum> museums) {
-    if (_mapController != null && museums.length != _lastDrawnCount) {
-      _addMuseumMarkers(museums);
-    }
-  }
-
-  Future<void> _addMuseumMarkers(List<Museum> museums) async {
-    if (_mapController == null) return;
-
-    await _mapController!.clearOverlays();
-    _lastDrawnCount = museums.length;
-
-    if (museums.isEmpty) return;
-
-    final Set<NMarker> markers = {};
-    for (final museum in museums) {
-      if (museum.latitude == null || museum.longitude == null) continue;
-
-      final color = _typeColor(museum.type);
-      final marker = NMarker(
-        id: museum.id,
-        position: NLatLng(museum.latitude!, museum.longitude!),
-        caption: NOverlayCaption(
-          text: museum.name,
-          textSize: 10,
-          color: _kNavy,
-          haloColor: Colors.white,
-        ),
-        iconTintColor: color,
-        size: const Size(24, 24),
-      );
-
-      marker.setOnTapListener((_) {
-        context.push('/museum/${museum.id}');
-      });
-
-      markers.add(marker);
-    }
-
-    await _mapController!.addOverlayAll(markers);
-  }
-
-  Color _typeColor(String? type) {
-    switch (type) {
-      case '박물관':
-        return _kGold;
-      case '미술관':
-        return const Color(0xFF7C4DFF);
-      case '기념관':
-        return const Color(0xFF00897B);
-      case '전시관':
-        return const Color(0xFF1565C0);
-      case '과학관':
-        return const Color(0xFFE65100);
-      default:
-        return _kNavy;
     }
   }
 
@@ -128,38 +61,46 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          NaverMap(
-            options: NaverMapViewOptions(
-              initialCameraPosition: NCameraPosition(
-                target: _initialPosition,
-                zoom: 11,
-              ),
-              locationButtonEnable: true,
-              consumeSymbolTapEvents: false,
+          // 공통 지도 컴포넌트 — overlay 관리는 내부에서 처리
+          museumsAsync.when(
+            data: (museums) => UnifiedMuseumMapView(
+              mode: MuseumMapMode.explore,
+              museums: museums,
+              visitedIds: const {},
+              bookmarkedIds: const {},
+              initialTarget: _initialPosition,
+              initialZoom: 11,
+              onMuseumTap: (museum, _) {
+                context.push('/museum/${museum.id}');
+              },
             ),
-            onMapReady: _onMapReady,
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
           ),
+
+          // 검색 바
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 16,
             right: 16,
             child: _SearchBarTile(onTap: () => context.go('/explore')),
           ),
+
+          // 유형 범례
           Positioned(
             top: MediaQuery.of(context).padding.top + 68,
             right: 16,
             child: const _TypeLegend(),
           ),
+
+          // 박물관 수 배지 / 로딩 / 에러
           museumsAsync.when(
-            data: (museums) {
-              _onMuseumsLoaded(museums);
-              return Positioned(
-                bottom: 24,
-                left: 0,
-                right: 0,
-                child: Center(child: _CountBadge(count: museums.length)),
-              );
-            },
+            data: (museums) => Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Center(child: _CountBadge(count: museums.length)),
+            ),
             loading: () => Positioned(
               bottom: 24,
               left: 0,
@@ -263,8 +204,9 @@ class _TypeLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const kGold = Color(0xFFB8860B);
     const items = [
-      ('박물관', _kGold),
+      ('박물관', kGold),
       ('미술관', Color(0xFF7C4DFF)),
       ('과학관', Color(0xFFE65100)),
     ];

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -7,29 +6,24 @@ import '../../../domain/models/museum.dart';
 import '../../providers/bookmark_provider.dart';
 import '../../providers/museum_provider.dart';
 import '../../providers/visit_provider.dart';
+import '../map/widgets/unified_museum_map_view.dart';
 
 // ─── 색상 상수 ────────────────────────────────────────────────────────────────
-const _kVisitedColor = Color(0xFFE8A87C); // 방문 마커 (진한 주황)
-const _kBookmarkColor = Color(0xFF90CAF9); // 북마크 마커 (연한 파랑)
-const _kDefaultColor = Color(0xFFBDBDBD); // 미방문 마커 (회색)
-const _kVisitedTintColor = Color(0xFFD4622A); // 방문 마커 틴트
-const _kBookmarkTintColor = Color(0xFF1565C0); // 북마크 마커 틴트
+const _kVisitedColor = Color(0xFFE8A87C);
+const _kBookmarkColor = Color(0xFF90CAF9);
+const _kDefaultColor = Color(0xFFBDBDBD);
+const _kVisitedTintColor = Color(0xFFD4622A);
+const _kBookmarkTintColor = Color(0xFF1565C0);
 
 // ─── 필터 열거형 ──────────────────────────────────────────────────────────────
 enum _MapFilter { all, visited, bookmarked }
 
-// ─── 기간 필터 ────────────────────────────────────────────────────────────────
 enum _PeriodFilter { all, thisMonth, thisYear }
 
 /// 마이페이지 내 "내가 다녀온 박물관 지도" 전체 화면.
 ///
-/// v1.6 신규 기능:
-/// - 방문(진한색) / 북마크(연한색) / 미방문(회색) 마커 색상 분리
-/// - 방문 횟수에 따른 마커 크기 차등 (최대 3배)
-/// - 마커 클러스터링 (NClusterableMarker + NaverMapClusteringOptions)
-/// - 필터: 전체/방문/북마크, 기간별
-/// - 통계 오버레이: 총 방문 수, 이번 달 방문, 가장 많이 방문한 지역
-/// - 클릭 인터랙션: 방문 마커 → 방문 기록 표시, 미방문 → 박물관 정보
+/// overlay 관리는 [UnifiedMuseumMapView]에 위임한다.
+/// 이 화면은 필터 UI, 통계 오버레이, 선택 패널 등 UI 상태만 관리한다.
 class MypageMapScreen extends ConsumerStatefulWidget {
   const MypageMapScreen({super.key});
 
@@ -38,12 +32,10 @@ class MypageMapScreen extends ConsumerStatefulWidget {
 }
 
 class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
-  NaverMapController? _mapController;
-
   // 필터 상태
   _MapFilter _filter = _MapFilter.all;
   _PeriodFilter _periodFilter = _PeriodFilter.all;
-  String? _typeFilter; // null = 전체
+  String? _typeFilter;
 
   // 통계 오버레이 표시 여부
   bool _showStats = true;
@@ -51,41 +43,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
   // 선택된 박물관 정보 패널
   Museum? _selectedMuseum;
   int _selectedVisitCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    // v1.9 이슈 4: 데이터 변경 감지 리스너 등록
-    // build() 안에서 addPostFrameCallback를 매 프레임 등록하는 패턴 제거
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.listenManual(mapMuseumsProvider, (_, __) => _maybeRefreshMarkers());
-      ref.listenManual(myVisitsProvider, (_, __) => _maybeRefreshMarkers());
-      ref.listenManual(bookmarkedIdsProvider, (_, __) => _maybeRefreshMarkers());
-    });
-  }
-
-  /// 지도가 준비된 경우에만 마커 갱신 (이슈 4 픽스)
-  void _maybeRefreshMarkers() {
-    if (_mapController == null || !mounted) return;
-    final museums = ref.read(mapMuseumsProvider).valueOrNull;
-    if (museums == null) return;
-    final visits = ref.read(myVisitsProvider).valueOrNull ?? [];
-    final bookmarkedIds = ref.read(bookmarkedIdsProvider);
-    final visitedIds = ref.read(visitedMuseumIdsProvider);
-    final visitCountMap = <String, int>{};
-    for (final v in visits) {
-      visitCountMap[v.museumId] = (visitCountMap[v.museumId] ?? 0) + 1;
-    }
-    final filteredVisitIds = _buildFilteredVisitIds(visits);
-    _refreshMarkers(
-      museums: museums,
-      visitedIds: visitedIds,
-      filteredVisitIds: filteredVisitIds,
-      bookmarkedIds: bookmarkedIds,
-      visitCountMap: visitCountMap,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +63,11 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
     // 통계 계산
     final stats = _buildStats(visits, visitedIds);
 
+    // 필터 문자열 변환
+    final activeFilterStr = _filter == _MapFilter.all
+        ? 'all'
+        : (_filter == _MapFilter.visited ? 'visited' : 'bookmarked');
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -116,7 +78,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
         backgroundColor: AppTheme.surfaceColor,
         elevation: 0,
         actions: [
-          // 통계 오버레이 토글
           IconButton(
             icon: Icon(
               _showStats ? Icons.bar_chart : Icons.bar_chart_outlined,
@@ -129,45 +90,28 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
       ),
       body: Stack(
         children: [
-          // 지도
+          // 공통 지도 컴포넌트 — overlay 관리는 내부에서 처리
           museumsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => _ErrorView(
               onRetry: () => ref.invalidate(mapMuseumsProvider),
             ),
-            data: (museums) {
-              // v1.9 이슈 4: build() 내 addPostFrameCallback 제거
-              // 마커 갱신은 onMapReady + listenManual에서만 수행
-              return NaverMap(
-                options: const NaverMapViewOptions(
-                  initialCameraPosition: NCameraPosition(
-                    target: NLatLng(36.5, 127.8), // 한국 중심
-                    zoom: 6.5,
-                  ),
-                  minZoom: 5,
-                  maxZoom: 18,
-                  mapType: NMapType.basic,
-                  activeLayerGroups: [
-                    NLayerGroup.building,
-                    NLayerGroup.transit,
-                  ],
-                ),
-                clusterOptions: NaverMapClusteringOptions(
-                  enableZoomRange: const NInclusiveRange(0, 14),
-                  clusterMarkerBuilder: _buildClusterMarker,
-                ),
-                onMapReady: (controller) {
-                  _mapController = controller;
-                  _refreshMarkers(
-                    museums: museums,
-                    visitedIds: visitedIds,
-                    filteredVisitIds: filteredVisitIds,
-                    bookmarkedIds: bookmarkedIds,
-                    visitCountMap: visitCountMap,
-                  );
-                },
-              );
-            },
+            data: (museums) => UnifiedMuseumMapView(
+              mode: MuseumMapMode.myMap,
+              museums: museums,
+              visitedIds: visitedIds,
+              bookmarkedIds: bookmarkedIds,
+              visitCountMap: visitCountMap,
+              filteredVisitIds: filteredVisitIds,
+              activeFilter: activeFilterStr,
+              typeFilter: _typeFilter,
+              onMarkerTap: (museum, visitCount) {
+                setState(() {
+                  _selectedMuseum = museum;
+                  _selectedVisitCount = visitCount;
+                });
+              },
+            ),
           ),
 
           // 상단 필터 바
@@ -179,21 +123,9 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
               filter: _filter,
               periodFilter: _periodFilter,
               typeFilter: _typeFilter,
-              onFilterChanged: (f) {
-                setState(() {
-                  _filter = f;
-                });
-              },
-              onPeriodChanged: (p) {
-                setState(() {
-                  _periodFilter = p;
-                });
-              },
-              onTypeChanged: (t) {
-                setState(() {
-                  _typeFilter = t;
-                });
-              },
+              onFilterChanged: (f) => setState(() => _filter = f),
+              onPeriodChanged: (p) => setState(() => _periodFilter = p),
+              onTypeChanged: (t) => setState(() => _typeFilter = t),
             ),
           ),
 
@@ -219,8 +151,9 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                 isBookmarked: bookmarkedIds.contains(_selectedMuseum!.id),
                 onClose: () => setState(() => _selectedMuseum = null),
                 onNavigate: () {
+                  final id = _selectedMuseum!.id;
                   setState(() => _selectedMuseum = null);
-                  context.push('/museum/${_selectedMuseum!.id}');
+                  context.push('/museum/$id');
                 },
               ),
             ),
@@ -234,116 +167,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
         ],
       ),
     );
-  }
-
-  // ── 마커 갱신 ──────────────────────────────────────────────────────────────
-
-  Future<void> _refreshMarkers({
-    required List<Museum> museums,
-    required Set<String> visitedIds,
-    required Set<String> filteredVisitIds,
-    required Set<String> bookmarkedIds,
-    required Map<String, int> visitCountMap,
-  }) async {
-    if (_mapController == null) return;
-
-    // 기존 마커 제거
-     await _mapController!.clearOverlays();
-    final Set<NClusterableMarker> markers = {};
-
-    for (final museum in museums) {
-      if (museum.latitude == null || museum.longitude == null) continue;
-
-      final isVisited = filteredVisitIds.contains(museum.id);
-      final isBookmarked = bookmarkedIds.contains(museum.id);
-
-      // 필터 적용
-      if (_filter == _MapFilter.visited && !isVisited) continue;
-      if (_filter == _MapFilter.bookmarked && !isBookmarked) continue;
-      if (_typeFilter != null && museum.type != _typeFilter) continue;
-
-      final visitCount = visitCountMap[museum.id] ?? 0;
-
-      // 마커 크기 (방문 횟수 기반: 1회=24, 2회=30, 3회+=36)
-      final markerSize = isVisited
-          ? NSize(
-              (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-              (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-            )
-          : const NSize(20, 20);
-
-      // 마커 색상
-      final Color tintColor;
-      if (isVisited) {
-        tintColor = _kVisitedTintColor;
-      } else if (isBookmarked) {
-        tintColor = _kBookmarkTintColor;
-      } else {
-        tintColor = _kDefaultColor;
-      }
-
-      // 태그 (클러스터 구분용)
-      final tag = isVisited
-          ? 'visited'
-          : (isBookmarked ? 'bookmarked' : 'default');
-
-      final marker = NClusterableMarker(
-        id: museum.id,
-        position: NLatLng(museum.latitude!, museum.longitude!),
-        iconTintColor: tintColor,
-        size: markerSize,
-        tags: {'type': tag, 'museumId': museum.id},
-        caption: isVisited && visitCount > 1
-            ? NOverlayCaption(
-                text: '×$visitCount',
-                color: _kVisitedTintColor,
-                haloColor: Colors.white,
-                textSize: 10,
-              )
-            : null,
-      );
-
-      // 클릭 이벤트
-      marker.setOnTapListener((overlay) {
-        final tappedMuseum =
-            museums.firstWhere((m) => m.id == museum.id);
-        setState(() {
-          _selectedMuseum = tappedMuseum;
-          _selectedVisitCount = visitCount;
-        });
-      });
-
-      markers.add(marker);
-    }
-
-    if (_mapController != null) {
-      await _mapController!.addOverlayAll(markers);
-    }
-  }
-
-  // ── 클러스터 마커 빌더 ─────────────────────────────────────────────────────
-
-  static void _buildClusterMarker(
-      NClusterInfo info, NClusterMarker clusterMarker) {
-    // 클러스터 내 방문 마커 수 계산
-    final visitedCount = info.children
-        .whereType<NClusterableMarkerInfo>()
-        .where((c) => c.tags['type'] == 'visited')
-        .length;
-    final hasVisited = visitedCount > 0;
-
-    final color = hasVisited ? _kVisitedTintColor : _kBookmarkTintColor;
-    final size = (32 + (info.size / 10).clamp(0, 20)).toDouble();
-
-    clusterMarker
-      ..setSize(NSize(size, size))
-      ..setIconTintColor(color)
-      ..setCaption(NOverlayCaption(
-        text: info.size.toString(),
-        color: Colors.white,
-        haloColor: Colors.transparent,
-        textSize: 12,
-      ));
   }
 
   // ── 기간 필터 적용 방문 집합 ───────────────────────────────────────────────
@@ -372,7 +195,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
             v.visitedAt.year == now.year && v.visitedAt.month == now.month)
         .length;
 
-    // 가장 많이 방문한 지역
     final regionCount = <String, int>{};
     for (final v in visits) {
       if (v.museum != null) {
@@ -433,7 +255,6 @@ class _FilterBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 주 필터 (전체/방문/북마크)
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -458,7 +279,6 @@ class _FilterBar extends StatelessWidget {
                 onTap: () => onFilterChanged(_MapFilter.bookmarked),
               ),
               const SizedBox(width: 12),
-              // 기간 필터
               _FilterChip(
                 label: '전기간',
                 selected: periodFilter == _PeriodFilter.all,
@@ -477,7 +297,6 @@ class _FilterBar extends StatelessWidget {
                 onTap: () => onPeriodChanged(_PeriodFilter.thisYear),
               ),
               const SizedBox(width: 12),
-              // 유형 필터
               _FilterChip(
                 label: '유형 전체',
                 selected: typeFilter == null,
@@ -487,13 +306,15 @@ class _FilterBar extends StatelessWidget {
               _FilterChip(
                 label: '박물관',
                 selected: typeFilter == '박물관',
-                onTap: () => onTypeChanged(typeFilter == '박물관' ? null : '박물관'),
+                onTap: () =>
+                    onTypeChanged(typeFilter == '박물관' ? null : '박물관'),
               ),
               const SizedBox(width: 6),
               _FilterChip(
                 label: '미술관',
                 selected: typeFilter == '미술관',
-                onTap: () => onTypeChanged(typeFilter == '미술관' ? null : '미술관'),
+                onTap: () =>
+                    onTypeChanged(typeFilter == '미술관' ? null : '미술관'),
               ),
             ],
           ),
@@ -697,7 +518,6 @@ class _MuseumInfoPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 핸들 + 닫기
           Row(
             children: [
               Expanded(
@@ -722,7 +542,6 @@ class _MuseumInfoPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // 박물관 이름 + 유형 배지
           Row(
             children: [
               Expanded(
@@ -742,7 +561,6 @@ class _MuseumInfoPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          // 지역
           if (museum.region1.isNotEmpty)
             Row(
               children: [
@@ -759,7 +577,6 @@ class _MuseumInfoPanel extends StatelessWidget {
               ],
             ),
           const SizedBox(height: 10),
-          // 방문 상태 행
           Row(
             children: [
               if (isVisited) ...[
@@ -813,11 +630,8 @@ class _MuseumInfoPanel extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
-              // 상세 보기 버튼
               ElevatedButton.icon(
-                onPressed: () {
-                  context.push('/museum/${museum.id}');
-                },
+                onPressed: onNavigate,
                 icon: const Icon(Icons.arrow_forward, size: 14),
                 label: const Text('상세 보기'),
                 style: ElevatedButton.styleFrom(
@@ -847,7 +661,8 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = type == '미술관' ? Colors.purple.shade400 : _kVisitedTintColor;
+    final color =
+        type == '미술관' ? Colors.purple.shade400 : _kVisitedTintColor;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
