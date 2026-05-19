@@ -245,10 +245,15 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
     required Set<String> bookmarkedIds,
     required Map<String, int> visitCountMap,
   }) async {
-    if (_mapController == null) return;
-
+        if (_mapController == null) return;
     // 기존 마커 제거
-     await _mapController!.clearOverlays();
+    // clearOverlays는 try-catch로 방어 처리
+    // 빈 overlay 상태에서 호출하면 flutter_naver_map에서 PlatformException이 발생할 수 있음
+    try {
+      await _mapController!.clearOverlays();
+    } catch (e) {
+      debugPrint('[MypageMap] clearOverlays failed ignored: $e');
+    }
     final Set<NClusterableMarker> markers = {};
 
     for (final museum in museums) {
@@ -317,7 +322,11 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
     }
 
     if (_mapController != null) {
-      await _mapController!.addOverlayAll(markers);
+      try {
+        await _mapController!.addOverlayAll(markers);
+      } catch (e) {
+        debugPrint('[MypageMap] addOverlayAll failed ignored: $e');
+      }
     }
   }
 

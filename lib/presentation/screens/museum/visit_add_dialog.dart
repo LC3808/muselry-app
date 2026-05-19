@@ -48,8 +48,11 @@ class _VisitAddDialogState extends ConsumerState<VisitAddDialog> {
     }
   }
 
-    Future<void> _submit() async {
+  Future<void> _submit() async {
     setState(() => _isSubmitting = true);
+    // async gap 이전에 context 의존 값을 미리 캡처
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    final scaffoldMessenger = ScaffoldMessenger.of(rootContext);
     try {
       await ref.read(myVisitsProvider.notifier).addVisit(
         museumId: widget.museumId,
@@ -60,15 +63,13 @@ class _VisitAddDialogState extends ConsumerState<VisitAddDialog> {
       );
       if (!mounted) return;
 
-      // pop 전에 부모 context를 미리 캡처 (Navigator.pop 후에는 다이얼로그의 context가 무효화됨)
-      final rootContext = Navigator.of(context, rootNavigator: true).context;
       final museumId = widget.museumId;
       final museumName = widget.museumName;
 
       Navigator.pop(context);
 
       // 부모 Scaffold의 ScaffoldMessenger 사용 (다이얼로그가 닫혀도 유효)
-      ScaffoldMessenger.of(rootContext).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         SnackBar(
           content: const Text('방문이 기록되었습니다.'),
           duration: const Duration(seconds: 5),

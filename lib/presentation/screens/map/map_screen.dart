@@ -71,7 +71,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Future<void> _addMuseumMarkers(List<Museum> museums) async {
     if (_mapController == null) return;
 
-    await _mapController!.clearOverlays();
+    // clearOverlays는 기존에 그린 마커가 있을 때만 호출
+    // 빈 overlay 상태에서 호출하면 flutter_naver_map에서 PlatformException이 발생할 수 있음
+    if (_lastDrawnCount > 0) {
+      try {
+        await _mapController!.clearOverlays();
+      } catch (e) {
+        debugPrint('[Map] clearOverlays failed ignored: $e');
+      }
+    }
+
     _lastDrawnCount = museums.length;
 
     if (museums.isEmpty) return;
@@ -101,7 +110,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       markers.add(marker);
     }
 
-    await _mapController!.addOverlayAll(markers);
+    try {
+      await _mapController!.addOverlayAll(markers);
+    } catch (e) {
+      debugPrint('[Map] addOverlayAll failed ignored: $e');
+    }
   }
 
   Color _typeColor(String? type) {
