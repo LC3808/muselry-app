@@ -40,6 +40,11 @@ class MypageMapScreen extends ConsumerStatefulWidget {
 class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
   NaverMapController? _mapController;
 
+  // lifecycle guard
+  bool _isDisposed = false;
+  bool _isRefreshingMarkers = false;
+  int _markerRefreshGeneration = 0;
+
   // 필터 상태
   _MapFilter _filter = _MapFilter.all;
   _PeriodFilter _periodFilter = _PeriodFilter.all;
@@ -67,14 +72,15 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
 
   @override
   void dispose() {
-    // dispose 시 controller 참조 해제 — 늦게 도착한 async 작업이 무효화된 controller를 건드리지 않도록
+    _isDisposed = true;
+    _markerRefreshGeneration++;
     _mapController = null;
     super.dispose();
   }
 
   /// 지도가 준비된 경우에만 마커 갱신 (이슈 4 픽스)
   void _maybeRefreshMarkers() {
-    if (_mapController == null || !mounted) return;
+    if (_isDisposed || !mounted || _mapController == null) return;
     final museums = ref.read(mapMuseumsProvider).valueOrNull;
     if (museums == null) return;
     final visits = ref.read(myVisitsProvider).valueOrNull ?? [];
@@ -164,7 +170,9 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                   clusterMarkerBuilder: _buildClusterMarker,
                 ),
                 onMapReady: (controller) {
+                  if (_isDisposed || !mounted) return;
                   _mapController = controller;
+                  debugPrint('[MypageMap] onMapReady');
                   _refreshMarkers(
                     museums: museums,
                     visitedIds: visitedIds,
@@ -252,87 +260,135 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
     required Set<String> bookmarkedIds,
     required Map<String, int> visitCountMap,
   }) async {
-        if (_mapController == null) return;
-    // 기존 마커 제거
-    // clearOverlays는 try-catch로 방어 처리
-    // 빈 overlay 상태에서 호출하면 flutter_naver_map에서 PlatformException이 발생할 수 있음
+    if (_isDisposed || !mounted) return;
+    if (_isRefreshingMarkers) return;
+
+    final controller = _mapController;
+    if (controller == null) return;
+
+    final generation = ++_markerRefreshGeneration;
+    _isRefreshingMarkers = true;
+
+    debugPrint('[MypageMap] refresh markers start count=${museums.length}');
+
     try {
-      await _mapController!.clearOverlays();
-    } catch (e) {
-      debugPrint('[MypageMap] clearOverlays failed ignored: $e');
-    }
-    final Set<NClusterableMarker> markers = {};
-
-    for (final museum in museums) {
-      if (museum.latitude == null || museum.longitude == null) continue;
-
-      final isVisited = filteredVisitIds.contains(museum.id);
-      final isBookmarked = bookmarkedIds.contains(museum.id);
-
-      // 필터 적용
-      if (_filter == _MapFilter.visited && !isVisited) continue;
-      if (_filter == _MapFilter.bookmarked && !isBookmarked) continue;
-      if (_typeFilter != null && museum.type != _typeFilter) continue;
-
-      final visitCount = visitCountMap[museum.id] ?? 0;
-
-      // 마커 크기 (방문 횟수 기반: 1회=24, 2회=30, 3회+=36)
-      final markerSize = isVisited
-          ? NSize(
-              (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-              (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-            )
-          : const NSize(20, 20);
-
-      // 마커 색상
-      final Color tintColor;
-      if (isVisited) {
-        tintColor = _kVisitedTintColor;
-      } else if (isBookmarked) {
-        tintColor = _kBookmarkTintColor;
-      } else {
-        tintColor = _kDefaultColor;
+      // clearOverlays 직전 상태 재확인
+      if (_isDisposed ||
+          !mounted ||
+          _mapController != controller ||
+          generation != _markerRefreshGeneration) {
+        debugPrint('[MypageMap] refresh skipped before clear: disposed/controller changed');
+        return;
       }
 
-      // 태그 (클러스터 구분용)
-      final tag = isVisited
-          ? 'visited'
-          : (isBookmarked ? 'bookmarked' : 'default');
-
-      final marker = NClusterableMarker(
-        id: museum.id,
-        position: NLatLng(museum.latitude!, museum.longitude!),
-        iconTintColor: tintColor,
-        size: markerSize,
-        tags: {'type': tag, 'museumId': museum.id},
-        caption: isVisited && visitCount > 1
-            ? NOverlayCaption(
-                text: '×$visitCount',
-                color: _kVisitedTintColor,
-                haloColor: Colors.white,
-                textSize: 10,
-              )
-            : null,
-      );
-
-      // 클릭 이벤트
-      marker.setOnTapListener((overlay) {
-        final tappedMuseum =
-            museums.firstWhere((m) => m.id == museum.id);
-        setState(() {
-          _selectedMuseum = tappedMuseum;
-          _selectedVisitCount = visitCount;
-        });
-      });
-
-      markers.add(marker);
-    }
-
-    if (_mapController != null) {
       try {
-        await _mapController!.addOverlayAll(markers);
+        debugPrint('[MypageMap] clear overlays');
+        await controller.clearOverlays();
+      } catch (e) {
+        debugPrint('[MypageMap] clearOverlays failed ignored: $e');
+      }
+
+      // clearOverlays 이후 상태 재확인
+      if (_isDisposed ||
+          !mounted ||
+          _mapController != controller ||
+          generation != _markerRefreshGeneration) {
+        debugPrint('[MypageMap] refresh skipped after clear: disposed/controller changed');
+        return;
+      }
+
+      final Set<NClusterableMarker> markers = {};
+
+      for (final museum in museums) {
+        if (museum.latitude == null || museum.longitude == null) continue;
+
+        final isVisited = filteredVisitIds.contains(museum.id);
+        final isBookmarked = bookmarkedIds.contains(museum.id);
+
+        // 필터 적용
+        if (_filter == _MapFilter.visited && !isVisited) continue;
+        if (_filter == _MapFilter.bookmarked && !isBookmarked) continue;
+        if (_typeFilter != null && museum.type != _typeFilter) continue;
+
+        final visitCount = visitCountMap[museum.id] ?? 0;
+
+        // 마커 크기 (방문 횟수 기반: 1회=24, 2회=30, 3회+=36)
+        final markerSize = isVisited
+            ? NSize(
+                (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
+                (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
+              )
+            : const NSize(20, 20);
+
+        // 마커 색상
+        final Color tintColor;
+        if (isVisited) {
+          tintColor = _kVisitedTintColor;
+        } else if (isBookmarked) {
+          tintColor = _kBookmarkTintColor;
+        } else {
+          tintColor = _kDefaultColor;
+        }
+
+        // 태그 (클러스터 구분용)
+        final tag = isVisited
+            ? 'visited'
+            : (isBookmarked ? 'bookmarked' : 'default');
+
+        final marker = NClusterableMarker(
+          id: museum.id,
+          position: NLatLng(museum.latitude!, museum.longitude!),
+          iconTintColor: tintColor,
+          size: markerSize,
+          tags: {'type': tag, 'museumId': museum.id},
+          caption: isVisited && visitCount > 1
+              ? NOverlayCaption(
+                  text: '×$visitCount',
+                  color: _kVisitedTintColor,
+                  haloColor: Colors.white,
+                  textSize: 10,
+                )
+              : null,
+        );
+
+        // 클릭 이벤트
+        marker.setOnTapListener((overlay) {
+          final tappedMuseum =
+              museums.firstWhere((m) => m.id == museum.id);
+          if (!mounted) return;
+          setState(() {
+            _selectedMuseum = tappedMuseum;
+            _selectedVisitCount = visitCount;
+          });
+        });
+
+        markers.add(marker);
+      }
+
+      if (markers.isEmpty) {
+        debugPrint('[MypageMap] no markers to add');
+        return;
+      }
+
+      // addOverlayAll 직전 상태 재확인
+      if (_isDisposed ||
+          !mounted ||
+          _mapController != controller ||
+          generation != _markerRefreshGeneration) {
+        debugPrint('[MypageMap] refresh skipped before add: disposed/controller changed');
+        return;
+      }
+
+      try {
+        debugPrint('[MypageMap] add markers count=${markers.length}');
+        await controller.addOverlayAll(markers);
+        debugPrint('[MypageMap] refresh markers done');
       } catch (e) {
         debugPrint('[MypageMap] addOverlayAll failed ignored: $e');
+      }
+    } finally {
+      if (generation == _markerRefreshGeneration) {
+        _isRefreshingMarkers = false;
       }
     }
   }
