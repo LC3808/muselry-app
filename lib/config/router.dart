@@ -11,6 +11,7 @@ import '../presentation/screens/map/map_screen.dart';
 import '../presentation/screens/records/records_screen.dart';
 import '../presentation/screens/community/community_screen.dart';
 import '../presentation/screens/detail/museum_detail_screen.dart';
+import '../presentation/screens/mypage/bookmarks_screen.dart';
 import '../presentation/screens/mypage/mypage_map_screen.dart';
 import '../presentation/screens/mypage/mypage_screen.dart';
 import '../presentation/screens/visit/visit_history_screen.dart';
@@ -34,6 +35,7 @@ class AppRoutes {
   static const String museumReviews = '/museum/:id/reviews';
   static const String myReviews = '/my-reviews';
   static const String mypageMap = '/mypage/map';
+  static const String bookmarks = '/mypage/bookmarks';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -178,6 +180,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.mypageMap,
         builder: (context, state) => const MypageMapScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.bookmarks,
+        builder: (context, state) => const BookmarksScreen(),
       ),
     ],
   );

@@ -512,11 +512,24 @@ class _BookmarkSection extends ConsumerWidget {
               ),
               bookmarkedAsync.when(
                 data: (museums) => museums.isNotEmpty
-                    ? Text(
-                        '${museums.length}곳',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textSecondaryColor,
+                    ? GestureDetector(
+                        onTap: () => context.push('/mypage/bookmarks'),
+                        child: Row(
+                          children: [
+                            Text(
+                              '전체 ${museums.length}개',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ],
                         ),
                       )
                     : const SizedBox.shrink(),
@@ -559,8 +572,10 @@ class _BookmarkSection extends ConsumerWidget {
                   ),
                 );
               }
+              // 최대 3개만 미리보기로 표시
+              final previewMuseums = museums.take(3).toList();
               return Column(
-                children: museums
+                children: previewMuseums
                     .map((museum) => _BookmarkTile(
                           name: museum.name,
                           type: museum.type,
