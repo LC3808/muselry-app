@@ -15,11 +15,19 @@ class MainScaffold extends StatelessWidget {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: navigationShell.currentIndex,
         onTap: (index) {
+          // [진단] 하단 탭 onTap 로그
+          // ignore: avoid_print
+          print('[BottomNav] tapped index=$index currentIndex=${navigationShell.currentIndex}');
+
           // W1 수정: goBranch로 탭 전환 — 스크롤 위치 유지
           navigationShell.goBranch(
             index,
             initialLocation: index == navigationShell.currentIndex,
           );
+
+          // [진단] goBranch 호출 후 로그
+          // ignore: avoid_print
+          print('[BottomNav] goBranch($index) called');
         },
         items: const [
           BottomNavigationBarItem(

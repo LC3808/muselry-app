@@ -21,15 +21,27 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
   // 스트림 에러를 catch하여 세션 복구 실패를 안전하게 처리
   final controller = StreamController<AuthState>();
 
+  // [진단] authStateProvider 초기화 로그
+  // ignore: avoid_print
+  print('[Auth] authStateProvider initialized');
+
   final subscription = authService.authStateChanges.listen(
     (state) {
+      // [진단] auth state 이벤트 로그
+      // ignore: avoid_print
+      print('[Auth] state event=${state.event}, session=${state.session == null ? "null" : "user=${state.session?.user.id}"}');
       if (!controller.isClosed) controller.add(state);
     },
     onError: (Object error, StackTrace stack) {
+      // [진단] auth state 스트림 에러 로그
+      // ignore: avoid_print
+      print('[Auth] state stream error: $error');
       debugPrint('[Auth] authStateChanges error: $error');
 
       // 네트워크/세션 만료 오류 → 세션 초기화 후 로그인 화면으로
       if (_isSessionRecoveryError(error)) {
+        // ignore: avoid_print
+        print('[Auth] session recovery error detected → signing out');
         debugPrint('[Auth] session recovery failed — signing out silently');
         // signOut은 비동기지만 스트림 에러 핸들러에서 await 불가
         // unawaited로 실행하고 authStateChanges가 signedOut 이벤트를 emit하면
@@ -40,6 +52,8 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
           }),
         );
       } else {
+        // ignore: avoid_print
+        print('[Auth] non-recovery error, NOT signing out');
         // 그 외 오류는 스트림으로 전달 (Riverpod error state)
         if (!controller.isClosed) controller.addError(error, stack);
       }
