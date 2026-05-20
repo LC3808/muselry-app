@@ -355,9 +355,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
             return isVisited || isBookmarked;
         }
       }).toList();
-      debugPrint(
-          '[MypageMap] visibleMuseums: ${visibleMuseums.length} / ${museums.length} (filter=$_filter)');
-
       final Set<NMarker> markers = {};
       for (final museum in visibleMuseums) {
         if (museum.latitude == null || museum.longitude == null) continue;
