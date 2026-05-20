@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -46,11 +49,42 @@ Future<void> main() async {
     }
   });
 
+  // 앱 전체 unhandled exception 방어
+  // Supabase recoverSession / refreshSession 실패(SocketException, AuthRetryableFetchException)가
+  // 앱을 죽이지 않도록 처리합니다.
+  // 세션 복구 실패는 authStateProvider 스트림에서 별도로 처리합니다.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final exception = details.exception;
+    if (_isNetworkOrAuthError(exception)) {
+      debugPrint('[App] FlutterError (network/auth): ${details.exception}');
+      // 세션 복구 실패는 authStateProvider에서 처리 — 앱 크래시 방지
+      return;
+    }
+    FlutterError.presentError(details);
+  };
+
   runApp(
     const ProviderScope(
       child: MuselryApp(),
     ),
   );
+}
+
+/// 네트워크/인증 관련 일시적 오류 여부 판단
+bool _isNetworkOrAuthError(Object exception) {
+  if (exception is SocketException) return true;
+  if (exception is AuthRetryableFetchException) return true;
+  // "Access token is expired" 등 문자열 포함 AuthException
+  if (exception is AuthException) {
+    final msg = exception.message.toLowerCase();
+    if (msg.contains('expired') ||
+        msg.contains('refresh') ||
+        msg.contains('network') ||
+        msg.contains('fetch')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 class MuselryApp extends ConsumerWidget {
