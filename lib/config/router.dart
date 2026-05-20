@@ -52,21 +52,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthenticated = ref.read(isAuthenticatedProvider);
       final location = state.uri.toString();
 
-      // [진단] redirect 진입 로그
-      // ignore: avoid_print
-      print('[Router] redirect from=${state.matchedLocation} uri=${state.uri} fullPath=${state.fullPath}');
-
-      // [진단] auth 상태 로그
-      final authState = ref.read(authStateProvider);
-      // ignore: avoid_print
-      print('[Router] auth state: ${authState.runtimeType}, hasValue=${authState.hasValue}, isLoading=${authState.isLoading}, hasError=${authState.hasError}, isAuthenticated=$isAuthenticated');
-
-      if (authState.hasValue) {
-        final authStateValue = authState.value;
-        // ignore: avoid_print
-        print('[Router] authState.value: event=${authStateValue?.event}, user=${authStateValue?.session?.user.id ?? "null"}');
-      }
-
       // 인증 화면 경로 여부
       final isAuthRoute = location == AppRoutes.login ||
           location == AppRoutes.signup ||
@@ -82,10 +67,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       else if (!isAuthenticated && !isAuthRoute) {
         finalDestination = AppRoutes.login;
       }
-
-      // [진단] 최종 결정 로그
-      // ignore: avoid_print
-      print('[Router] final decision: ${finalDestination ?? "no redirect (stay at $location)"}');
 
       return finalDestination;
     },

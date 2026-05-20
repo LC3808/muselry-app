@@ -73,7 +73,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_isDisposed || !mounted) return;
 
     _mapController = controller;
-    debugPrint('[Map] onMapReady');
 
     final museumsAsync = ref.read(mapMuseumsProvider);
     museumsAsync.whenData((museums) {
@@ -86,7 +85,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_isDisposed || !mounted) return;
     if (_mapController == null) return;
 
-    debugPrint('[Map] _onMuseumsLoaded count=${museums.length} lastDrawn=$_lastDrawnCount');
     if (museums.length != _lastDrawnCount) {
       _addMuseumMarkers(museums);
     }
@@ -102,7 +100,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final generation = ++_markerDrawGeneration;
     _isDrawingMarkers = true;
 
-    debugPrint('[Map] draw markers start count=${museums.length}');
 
     try {
       // clearOverlays 직전 상태 재확인
@@ -110,13 +107,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           !mounted ||
           _mapController != controller ||
           generation != _markerDrawGeneration) {
-        debugPrint('[Map] draw skipped before clear: disposed/controller changed');
         return;
       }
 
       if (_lastDrawnCount > 0) {
         try {
-          debugPrint('[Map] clear overlays');
           await controller.clearOverlays();
         } catch (e) {
           debugPrint('[Map] clearOverlays failed ignored: $e');
@@ -128,7 +123,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           !mounted ||
           _mapController != controller ||
           generation != _markerDrawGeneration) {
-        debugPrint('[Map] draw skipped after clear: disposed/controller changed');
         return;
       }
 
@@ -168,14 +162,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           !mounted ||
           _mapController != controller ||
           generation != _markerDrawGeneration) {
-        debugPrint('[Map] draw skipped before add: disposed/controller changed');
         return;
       }
 
       try {
-        debugPrint('[Map] add markers count=${markers.length}');
         await controller.addOverlayAll(markers);
-        debugPrint('[Map] draw markers done');
       } catch (e) {
         debugPrint('[Map] addOverlayAll failed ignored: $e');
       }

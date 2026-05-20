@@ -183,7 +183,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                 onMapReady: (controller) {
                   if (_isDisposed || !mounted) return;
                   _mapController = controller;
-                  debugPrint('[MypageMap] onMapReady');
                   _refreshMarkers(
                     museums: museums,
                     visitedIds: visitedIds,
@@ -322,17 +321,14 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
     final controller = _mapController!;
     final generation = ++_markerRefreshGeneration;
     _isRefreshingMarkers = true;
-    debugPrint('[MypageMap] refresh markers start count=${museums.length}');
     try {
       if (_isDisposed ||
           !mounted ||
           _mapController != controller ||
           generation != _markerRefreshGeneration) {
-        debugPrint('[MypageMap] refresh skipped before clear: disposed/controller changed');
         return;
       }
       try {
-        debugPrint('[MypageMap] clear overlays');
         await controller.clearOverlays();
       } catch (e) {
         debugPrint('[MypageMap] clearOverlays failed ignored: $e');
@@ -341,7 +337,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
           !mounted ||
           _mapController != controller ||
           generation != _markerRefreshGeneration) {
-        debugPrint('[MypageMap] refresh skipped after clear: disposed/controller changed');
         return;
       }
 
@@ -410,7 +405,6 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
       }
 
       if (markers.isEmpty) {
-        debugPrint('[MypageMap] no markers to add');
         return;
       }
 
@@ -418,13 +412,10 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
           !mounted ||
           _mapController != controller ||
           generation != _markerRefreshGeneration) {
-        debugPrint('[MypageMap] refresh skipped before add: disposed/controller changed');
         return;
       }
       try {
-        debugPrint('[MypageMap] add markers count=${markers.length}');
         await controller.addOverlayAll(markers);
-        debugPrint('[MypageMap] refresh markers done');
       } catch (e) {
         debugPrint('[MypageMap] addOverlayAll failed ignored: $e');
       }

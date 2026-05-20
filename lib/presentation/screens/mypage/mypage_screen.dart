@@ -17,7 +17,6 @@ class MypageScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[Mypage] MypageScreen build');
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -77,7 +76,6 @@ class _ProfileSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[Mypage] _ProfileSection build');
     final profileAsync = ref.watch(profileProvider);
     final displayName = ref.watch(displayNameProvider);
     final user = ref.watch(currentUserProvider);
@@ -213,10 +211,8 @@ class _StatsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[Mypage] _StatsSection build');
     final visitsAsync = ref.watch(myVisitsProvider);
     final stats = ref.watch(visitStatsProvider);
-    debugPrint('[Mypage] _StatsSection stats null=${stats == null}');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -261,7 +257,6 @@ class _StatsSection extends ConsumerWidget {
             ),
             error: (_, __) => _StatsError(),
             data: (_) {
-              debugPrint('[Mypage] _StatsSection data stats null=${stats == null}');
               if (stats == null) {
                 return const SizedBox(
                   height: 80,
@@ -286,7 +281,6 @@ class _StatsContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[Mypage] _StatsContent build');
     if (stats == null || stats!.totalCount == 0) {
       return Center(
         child: Padding(
@@ -520,7 +514,6 @@ class _BookmarkSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[Mypage] _BookmarkSection build');
     final bookmarkedAsync = ref.watch(bookmarkedMuseumsProvider);
 
     return Container(
@@ -774,7 +767,6 @@ class _MapPreviewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[Mypage] _MapPreviewSection build');
     final visitedIds = ref.watch(visitedMuseumIdsProvider);
     final bookmarkedIds = ref.watch(bookmarkedIdsProvider);
     final visits = ref.watch(myVisitsProvider).valueOrNull ?? [];
@@ -940,7 +932,6 @@ class _ActivitySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[Mypage] _ActivitySection build');
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
