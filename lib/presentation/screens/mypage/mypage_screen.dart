@@ -256,7 +256,17 @@ class _StatsSection extends ConsumerWidget {
               ),
             ),
             error: (_, __) => _StatsError(),
-            data: (_) => _StatsContent(stats: stats),
+            data: (_) {
+              if (stats == null) {
+                return const SizedBox(
+                  height: 80,
+                  child: Center(
+                    child: Text('방문 통계를 불러오는 중입니다'),
+                  ),
+                );
+              }
+              return _StatsContent(stats: stats);
+            },
           ),
         ],
       ),
@@ -300,18 +310,22 @@ class _StatsContent extends StatelessWidget {
         // 총 방문 수 + 고유 박물관 수 (P1-2 픽스)
         Row(
           children: [
-            _StatCard(
-              label: '총 방문 횟수',
-              value: '${s.totalCount}',
-              unit: '회',
-              color: AppTheme.primaryColor,
+            Expanded(
+              child: _StatCard(
+                label: '총 방문 횟수',
+                value: '${s.totalCount}',
+                unit: '회',
+                color: AppTheme.primaryColor,
+              ),
             ),
             const SizedBox(width: 12),
-            _StatCard(
-              label: '방문한 박물관',
-              value: '${s.distinctMuseumCount}',
-              unit: '곳',
-              color: AppTheme.accentColor,
+            Expanded(
+              child: _StatCard(
+                label: '방문한 박물관',
+                value: '${s.distinctMuseumCount}',
+                unit: '곳',
+                color: AppTheme.accentColor,
+              ),
             ),
           ],
         ),
@@ -348,53 +362,59 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: AppTheme.textSecondaryColor,
-                fontWeight: FontWeight.w500,
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondaryColor,
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
                   value,
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: color,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (unit.isNotEmpty) ...[
-                  const SizedBox(width: 3),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Text(
-                      unit,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondaryColor,
-                      ),
+              ),
+              if (unit.isNotEmpty) ...[
+                const SizedBox(width: 3),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text(
+                    unit,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondaryColor,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
+                ),
               ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -407,7 +427,11 @@ class _RegionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (topRegions.isEmpty) return const SizedBox.shrink();
     final total = topRegions.fold<int>(0, (sum, e) => sum + e.value);
+    if (total == 0) return const SizedBox.shrink();
+    final validRegions = topRegions.where((e) => e.value > 0).toList();
+    if (validRegions.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -420,20 +444,22 @@ class _RegionBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        ...topRegions.map((entry) {
-          final ratio = total > 0 ? entry.value / total : 0.0;
+        ...validRegions.map((entry) {
+          final ratio = entry.value / total;
           return Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(
               children: [
                 SizedBox(
-                  width: 32,
+                  width: 36,
                   child: Text(
                     entry.key,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textPrimaryColor,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -452,10 +478,12 @@ class _RegionBar extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '${entry.value}회',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondaryColor,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -512,11 +540,24 @@ class _BookmarkSection extends ConsumerWidget {
               ),
               bookmarkedAsync.when(
                 data: (museums) => museums.isNotEmpty
-                    ? Text(
-                        '${museums.length}곳',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textSecondaryColor,
+                    ? GestureDetector(
+                        onTap: () => context.push('/mypage/bookmarks'),
+                        child: Row(
+                          children: [
+                            Text(
+                              '전체 ${museums.length}개',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ],
                         ),
                       )
                     : const SizedBox.shrink(),
@@ -559,8 +600,10 @@ class _BookmarkSection extends ConsumerWidget {
                   ),
                 );
               }
+              // 최대 3개만 미리보기로 표시
+              final previewMuseums = museums.take(3).toList();
               return Column(
-                children: museums
+                children: previewMuseums
                     .map((museum) => _BookmarkTile(
                           name: museum.name,
                           type: museum.type,
@@ -919,15 +962,7 @@ class _ActivitySection extends ConsumerWidget {
           _MenuItem(
             icon: Icons.bookmark_border,
             label: '북마크한 박물관',
-            onTap: () {
-              // 북마크 섹션으로 스크롤 (현재는 페이지 내 표시)
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('위 북마크 섹션에서 확인하세요'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
+            onTap: () => context.push('/mypage/bookmarks'),
           ),
           Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
           _MenuItem(

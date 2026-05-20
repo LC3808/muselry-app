@@ -23,10 +23,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   NLatLng _initialPosition = const NLatLng(37.5665, 126.9780);
   int _lastDrawnCount = -1;
 
+  // lifecycle guard
+  bool _isDisposed = false;
+  bool _isDrawingMarkers = false;
+  int _markerDrawGeneration = 0;
+
   @override
   void initState() {
     super.initState();
     _loadCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _markerDrawGeneration++;
+    _mapController = null;
+    super.dispose();
   }
 
   Future<void> _loadCurrentLocation() async {
@@ -57,51 +70,111 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onMapReady(NaverMapController controller) {
+    if (_isDisposed || !mounted) return;
+
     _mapController = controller;
+
     final museumsAsync = ref.read(mapMuseumsProvider);
-    museumsAsync.whenData((museums) => _addMuseumMarkers(museums));
+    museumsAsync.whenData((museums) {
+      if (_isDisposed || !mounted || _mapController != controller) return;
+      _addMuseumMarkers(museums);
+    });
   }
 
   void _onMuseumsLoaded(List<Museum> museums) {
-    if (_mapController != null && museums.length != _lastDrawnCount) {
+    if (_isDisposed || !mounted) return;
+    if (_mapController == null) return;
+
+    if (museums.length != _lastDrawnCount) {
       _addMuseumMarkers(museums);
     }
   }
 
   Future<void> _addMuseumMarkers(List<Museum> museums) async {
-    if (_mapController == null) return;
+    if (_isDisposed || !mounted) return;
+    if (_isDrawingMarkers) return;
 
-    await _mapController!.clearOverlays();
-    _lastDrawnCount = museums.length;
+    final controller = _mapController;
+    if (controller == null) return;
 
-    if (museums.isEmpty) return;
+    final generation = ++_markerDrawGeneration;
+    _isDrawingMarkers = true;
 
-    final Set<NMarker> markers = {};
-    for (final museum in museums) {
-      if (museum.latitude == null || museum.longitude == null) continue;
 
-      final color = _typeColor(museum.type);
-      final marker = NMarker(
-        id: museum.id,
-        position: NLatLng(museum.latitude!, museum.longitude!),
-        caption: NOverlayCaption(
-          text: museum.name,
-          textSize: 10,
-          color: _kNavy,
-          haloColor: Colors.white,
-        ),
-        iconTintColor: color,
-        size: const Size(24, 24),
-      );
+    try {
+      // clearOverlays 직전 상태 재확인
+      if (_isDisposed ||
+          !mounted ||
+          _mapController != controller ||
+          generation != _markerDrawGeneration) {
+        return;
+      }
 
-      marker.setOnTapListener((_) {
-        context.push('/museum/${museum.id}');
-      });
+      if (_lastDrawnCount > 0) {
+        try {
+          await controller.clearOverlays();
+        } catch (e) {
+          debugPrint('[Map] clearOverlays failed ignored: $e');
+        }
+      }
 
-      markers.add(marker);
+      // clearOverlays 이후 상태 재확인
+      if (_isDisposed ||
+          !mounted ||
+          _mapController != controller ||
+          generation != _markerDrawGeneration) {
+        return;
+      }
+
+      _lastDrawnCount = museums.length;
+
+      if (museums.isEmpty) return;
+
+      final Set<NMarker> markers = {};
+      for (final museum in museums) {
+        if (museum.latitude == null || museum.longitude == null) continue;
+
+        final color = _typeColor(museum.type);
+        final marker = NMarker(
+          id: museum.id,
+          position: NLatLng(museum.latitude!, museum.longitude!),
+          caption: NOverlayCaption(
+            text: museum.name,
+            textSize: 10,
+            color: _kNavy,
+            haloColor: Colors.white,
+          ),
+          iconTintColor: color,
+          size: const Size(24, 24),
+        );
+
+        marker.setOnTapListener((_) {
+          context.push('/museum/${museum.id}');
+        });
+
+        markers.add(marker);
+      }
+
+      if (markers.isEmpty) return;
+
+      // addOverlayAll 직전 상태 재확인
+      if (_isDisposed ||
+          !mounted ||
+          _mapController != controller ||
+          generation != _markerDrawGeneration) {
+        return;
+      }
+
+      try {
+        await controller.addOverlayAll(markers);
+      } catch (e) {
+        debugPrint('[Map] addOverlayAll failed ignored: $e');
+      }
+    } finally {
+      if (generation == _markerDrawGeneration) {
+        _isDrawingMarkers = false;
+      }
     }
-
-    await _mapController!.addOverlayAll(markers);
   }
 
   Color _typeColor(String? type) {

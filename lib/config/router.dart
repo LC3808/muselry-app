@@ -11,6 +11,7 @@ import '../presentation/screens/map/map_screen.dart';
 import '../presentation/screens/records/records_screen.dart';
 import '../presentation/screens/community/community_screen.dart';
 import '../presentation/screens/detail/museum_detail_screen.dart';
+import '../presentation/screens/mypage/bookmarks_screen.dart';
 import '../presentation/screens/mypage/mypage_map_screen.dart';
 import '../presentation/screens/mypage/mypage_screen.dart';
 import '../presentation/screens/visit/visit_history_screen.dart';
@@ -34,6 +35,7 @@ class AppRoutes {
   static const String museumReviews = '/museum/:id/reviews';
   static const String myReviews = '/my-reviews';
   static const String mypageMap = '/mypage/map';
+  static const String bookmarks = '/mypage/bookmarks';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -55,17 +57,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           location == AppRoutes.signup ||
           location == AppRoutes.onboarding;
 
+      String? finalDestination;
+
       // 로그인된 상태에서 인증 화면 접근 시 홈으로 리다이렉트
       if (isAuthenticated && isAuthRoute) {
-        return AppRoutes.home;
+        finalDestination = AppRoutes.home;
       }
-
       // 비로그인 상태에서 보호된 화면 접근 시 로그인으로 리다이렉트
-      if (!isAuthenticated && !isAuthRoute) {
-        return AppRoutes.login;
+      else if (!isAuthenticated && !isAuthRoute) {
+        finalDestination = AppRoutes.login;
       }
 
-      return null; // 리다이렉트 없음
+      return finalDestination;
     },
     routes: [
       GoRoute(
@@ -158,6 +161,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.mypageMap,
         builder: (context, state) => const MypageMapScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.bookmarks,
+        builder: (context, state) => const BookmarksScreen(),
       ),
     ],
   );
