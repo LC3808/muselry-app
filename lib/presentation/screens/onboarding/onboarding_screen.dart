@@ -8,7 +8,6 @@ const Color _kBgColor = Color(0xFFFAF7F2);        // Warm Off-White
 const Color _kBrownPrimary = Color(0xFF5D4037);   // Deep Museum Brown
 const Color _kBrownSub = Color(0xFF6D4C41);       // Brown Variant
 const Color _kOrangeAccent = Color(0xFFD4622A);   // Visited Orange (버튼/포인트)
-const Color _kCreamBeige = Color(0xFFFBE9D0);     // Cream Beige (아이콘 배경)
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -71,50 +70,55 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 상단 로고 영역
+            // ── 상단 브랜드 영역 (로고 이미지 + 뮤즐리 타이틀 + 서브) ──────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              padding: const EdgeInsets.fromLTRB(24, 60, 24, 0),
+              child: Column(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: _kCreamBeige,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.place_rounded,
-                      color: _kOrangeAccent,
-                      size: 22,
-                    ),
+                  // 로고 이미지
+                  Image.asset(
+                    'assets/branding/splash_logo.png',
+                    height: 140,
+                    width: 140,
+                    fit: BoxFit.contain,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(height: 28),
+                  // 메인 타이틀: 뮤즐리
                   const Text(
                     '뮤즐리',
                     style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
                       color: _kBrownPrimary,
                       letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Muselry',
+                  const SizedBox(height: 6),
+                  // 서브 타이틀: 나만의 문화지도
+                  Text(
+                    '나만의 문화지도',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
-                      color: _kBrownSub,
-                      letterSpacing: 0.2,
+                      color: _kBrownSub.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // 부제: Muselry (작게)
+                  Text(
+                    'Muselry',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w300,
+                      color: _kBrownSub.withValues(alpha: 0.5),
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // 페이지 뷰
+            // ── 페이지 뷰 ─────────────────────────────────────────────────────
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -126,7 +130,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
 
-            // 하단 컨트롤 영역
+            // ── 하단 컨트롤 영역 ──────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
               child: Column(
@@ -207,49 +211,33 @@ class _OnboardingPageWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 24),
-          // 아이콘 컨테이너
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              color: _kCreamBeige,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(
-              page.icon,
-              size: 48,
-              color: _kOrangeAccent,
-            ),
-          ),
-          const SizedBox(height: 40),
-          // 제목
+          // 메인 문구 (페이지 제목)
           Text(
             page.title,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: _kBrownPrimary,
-              fontSize: 26,
+              fontSize: 24,
               fontWeight: FontWeight.w700,
               height: 1.4,
             ),
           ),
           const SizedBox(height: 16),
-          // 설명
+          // 설명 문구
           Text(
             page.description,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: _kBrownSub,
+            style: TextStyle(
+              color: _kBrownSub.withValues(alpha: 0.85),
               fontSize: 15,
               height: 1.7,
             ),
           ),
-          const SizedBox(height: 80),
         ],
       ),
     );
