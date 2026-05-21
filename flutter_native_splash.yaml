@@ -1,0 +1,14 @@
+flutter_native_splash:
+  # 기본 스플래시 (Android 11 이하 + iOS)
+  color: "#FAF7F2"
+  image: "assets/branding/splash_logo.png"
+
+  # Android 12+ 별도 처리 (네이티브 SplashScreen API)
+  android_12:
+    color: "#FAF7F2"
+    image: "assets/branding/splash_logo_android12.png"
+    icon_background_color: "#FBE9D0"
+
+  android: true
+  ios: true
+  web: false

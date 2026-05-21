@@ -80,6 +80,8 @@ dev_dependencies:
   riverpod_generator: ^2.6.4
   custom_lint: ^0.7.3
   riverpod_lint: ^2.6.3
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -95,4 +97,5 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - assets/branding/
     - .env
