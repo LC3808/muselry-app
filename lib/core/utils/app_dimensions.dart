@@ -39,10 +39,6 @@ class AppDimensions {
 
 /// 화면 크기에 따른 표준 spacing/sizing 값.
 class AppSpacing {
-  // 온보딩 로고
-  static double onboardingLogoSize(BuildContext context) =>
-      AppDimensions.isCompact(context) ? 100 : 140;
-
   // 카드 이미지 높이
   static double cardImageHeight(BuildContext context) =>
       AppDimensions.isCompact(context) ? 140 : 180;
