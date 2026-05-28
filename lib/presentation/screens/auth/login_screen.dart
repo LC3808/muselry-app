@@ -135,23 +135,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: Column(
                   children: [
-                    const Text('🏛️', style: TextStyle(fontSize: 56)),
-                    const SizedBox(height: 12),
-                    Text(
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFBE9D0),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.place_rounded,
+                        color: Color(0xFFD4622A),
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
                       '뮤즐리',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
-                        color: AppTheme.primaryColor,
+                        color: Color(0xFF5D4037),
                         letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      '전국 박물관·미술관 방문 기록',
+                    const Text(
+                      '박물관, 미술관, 과학관을 나만의 문화지도로 기록하세요',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textSecondaryColor,
+                        fontSize: 13,
+                        color: Color(0xFF6D4C41),
+                        height: 1.5,
                       ),
                     ),
                   ],
@@ -259,9 +273,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           foregroundColor: _kakaoLabel,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -293,7 +307,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
                     const SizedBox(height: 12),
                     // Google 로그인 버튼
                     SizedBox(
@@ -303,9 +316,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFFDADADA)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: Colors.white,
                         ),
                         child: Row(
@@ -348,9 +361,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,

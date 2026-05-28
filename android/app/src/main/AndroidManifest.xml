@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application
-        android:label="Muselry"
+        android:label="뮤즐리"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- 네이버 지도 SDK Client ID (ISSUE-006: Day 10 빌드 전 dart-define 방식으로 전환 예정) -->
