@@ -120,10 +120,12 @@ class _VisitAddDialogState extends ConsumerState<VisitAddDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('방문 기록 추가'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      content: SingleChildScrollView(
+        // 키보드가 올라와도 스크롤 가능하도록 감쌈
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           const Text(
             '어느 날 다녀오셨나요?',
             style: TextStyle(fontSize: 14),
@@ -162,6 +164,7 @@ class _VisitAddDialogState extends ConsumerState<VisitAddDialog> {
             ),
           ),
         ],
+        ),
       ),
       actions: [
         TextButton(

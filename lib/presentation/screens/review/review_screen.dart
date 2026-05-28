@@ -988,123 +988,126 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 핸들
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.dividerColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 제목 + 방문 날짜 배지
-            Row(
-              children: [
-                Text(
-                  widget.isEdit ? '리뷰 수정' : '리뷰 작성',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
+        child: SingleChildScrollView(
+          // 키보드가 올라와도 스크롤 가능하도록 감쌈
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 핸들
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                if (widget.visitedAt != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+              ),
+              const SizedBox(height: 16),
+              // 제목 + 방문 날짜 배지
+              Row(
+                children: [
+                  Text(
+                    widget.isEdit ? '리뷰 수정' : '리뷰 작성',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimaryColor,
                     ),
-                    child: Text(
-                      '${widget.visitedAt!.year}.${widget.visitedAt!.month.toString().padLeft(2, '0')}.${widget.visitedAt!.day.toString().padLeft(2, '0')} 방문',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.accentColor,
-                        fontWeight: FontWeight.w500,
+                  ),
+                  if (widget.visitedAt != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
                       ),
+                      child: Text(
+                        '${widget.visitedAt!.year}.${widget.visitedAt!.month.toString().padLeft(2, '0')}.${widget.visitedAt!.day.toString().padLeft(2, '0')} 방문',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.accentColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              // 별점 선택
+              const Text(
+                '별점',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimaryColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _RatingSelector(
+                rating: _rating,
+                onChanged: (r) => setState(() => _rating = r),
+              ),
+              const SizedBox(height: 16),
+              // 내용 입력
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '리뷰 내용',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimaryColor),
+                  ),
+                  Text(
+                    '$remaining자 남음',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: remaining < 50
+                          ? AppTheme.errorColor
+                          : AppTheme.textSecondaryColor,
                     ),
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: 16),
-            // 별점 선택
-            const Text(
-              '별점',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimaryColor,
               ),
-            ),
-            const SizedBox(height: 8),
-            _RatingSelector(
-              rating: _rating,
-              onChanged: (r) => setState(() => _rating = r),
-            ),
-            const SizedBox(height: 16),
-            // 내용 입력
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '리뷰 내용',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimaryColor),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _contentController,
+                maxLines: 5,
+                maxLength: _maxLength,
+                onChanged: _onContentChanged,
+                decoration: InputDecoration(
+                  hintText: '방문 경험을 솔직하게 작성해 주세요. ($_minLength~$_maxLength자)',
+                  counterText: '',
+                  errorText: _filterError,
                 ),
-                Text(
-                  '$remaining자 남음',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: remaining < 50
-                        ? AppTheme.errorColor
-                        : AppTheme.textSecondaryColor,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              // 제출 버튼
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (_isSubmitting || _filterError != null)
+                      ? null
+                      : _submit,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(widget.isEdit ? '수정 완료' : '등록'),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _contentController,
-              maxLines: 5,
-              maxLength: _maxLength,
-              onChanged: _onContentChanged,
-              decoration: InputDecoration(
-                hintText: '방문 경험을 솔직하게 작성해 주세요. ($_minLength~$_maxLength자)',
-                counterText: '',
-                errorText: _filterError,
               ),
-            ),
-            const SizedBox(height: 16),
-            // 제출 버튼
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: (_isSubmitting || _filterError != null)
-                    ? null
-                    : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(widget.isEdit ? '수정 완료' : '등록'),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
