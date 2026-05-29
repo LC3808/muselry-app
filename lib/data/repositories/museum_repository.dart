@@ -49,9 +49,9 @@ class MuseumRepository {
       }
     }
 
-    // Day 9: 어린이 친화 필터
+    // T4 사이클 1.5: kids_category 기준으로 통일 (is_kids_friendly 폐지, 모델 필드는 DB 호환 유지)
     if (isKidsFriendly == true) {
-      query = query.eq('is_kids_friendly', true);
+      query = query.not('kids_category', 'is', null);
     }
 
     // v1.9: 무료 관람 필터 (is_free 콼럼 기반)

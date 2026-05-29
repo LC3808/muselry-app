@@ -183,11 +183,41 @@ class _DetailBody extends ConsumerWidget {
                   const SizedBox(height: 16),
                 ],
 
-                // Day 9: 어린이 친화 노트 섹션
-                if (museum.isKidsFriendly) ...[  
+                // T4 사이클 1.5: kidsCategory 기준으로 어린이 정보 섹션 표시
+                if (museum.isKidsDedicated) ...[  
+                  const _SectionTitle(title: '🏛️ 어린이 전용 정보'),
+                  const SizedBox(height: 8),
+                  _SectionCard(
+                    borderColor: const Color(0xFFD4622A),
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('🏛️', style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              museum.kidsNote?.isNotEmpty == true
+                                  ? museum.kidsNote!
+                                  : '어린이를 위해 설계된 전용 시설입니다.',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6D4C41),
+                                height: 1.6,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ] else if (museum.isKidsFriendlyTagged &&
+                    museum.kidsNote?.isNotEmpty == true) ...[  
                   const _SectionTitle(title: '👶 어린이 친화 정보'),
                   const SizedBox(height: 8),
                   _SectionCard(
+                    borderColor: const Color(0xFFF5E6D3),
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,9 +226,7 @@ class _DetailBody extends ConsumerWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              museum.kidsNote?.isNotEmpty == true
-                                  ? museum.kidsNote!
-                                  : '어린이와 함께 방문하기 좋은 박물관입니다.',
+                              museum.kidsNote!,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[700],
@@ -369,7 +397,8 @@ class _SectionTitle extends StatelessWidget {
 
 class _SectionCard extends StatelessWidget {
   final List<Widget> children;
-  const _SectionCard({required this.children});
+  final Color? borderColor;
+  const _SectionCard({required this.children, this.borderColor});
 
   @override
   Widget build(BuildContext context) {
@@ -379,6 +408,9 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: borderColor != null
+            ? Border.all(color: borderColor!, width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),

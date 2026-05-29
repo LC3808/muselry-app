@@ -1,3 +1,28 @@
+/// Museum 모델
+///
+/// 어린이 분류 관련:
+/// - is_kids_friendly: 기존 boolean (DB 호환 유지, legacy)
+/// - kids_category: 신규 분류 (null / 'friendly' / 'dedicated')
+///   - 현재 검색/필터/카드/상세 모두 kids_category 기준 (사이클 1.5)
+///
+/// TODO (T6 이후): 사용자 추천 기반 어린이 친화 시스템
+/// 3단계 승격 구조:
+///
+/// 1단계: 사용자 신호 별도 저장
+///   - museum_kids_feedback 테이블 (또는 reviews/visits 확장)
+///   - museum_id, user_id, visit_id, is_recommended, age_group, tags, memo
+///   - 방문 기록/리뷰 작성 시 "아이와 함께 방문하기 좋았나요?" 체크
+///
+/// 2단계: 앱에 "이용자 추천"으로 표시 (공식 분류와 분리)
+///   - 어린이 친화: 운영자/DB 검토 완료 (kids_category)
+///   - 이용자 추천: 사용자 피드백 기반 (별도 표시)
+///
+/// 3단계: 기준 충족 시 운영자 검토 후 승격
+///   - 서로 다른 사용자 3~5명 이상 추천
+///   - 부정 피드백 비율 낙음
+///   - 운영자 확인 → kids_category=friendly로 승격
+///
+/// 주의: 사용자 추천을 바로 공식 분류로 매핑하지 말 것
 class Museum {
   final String id;
   final String name;
