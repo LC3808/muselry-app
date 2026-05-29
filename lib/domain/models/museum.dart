@@ -22,6 +22,7 @@ class Museum {
   final int? reviewCount;
   final bool isKidsFriendly;
   final String? kidsNote;
+  final String? kidsCategory; // 'dedicated' | 'friendly' | null
 
   const Museum({
     required this.id,
@@ -47,6 +48,7 @@ class Museum {
     this.reviewCount,
     this.isKidsFriendly = false,
     this.kidsNote,
+    this.kidsCategory,
   });
 
   factory Museum.fromJson(Map<String, dynamic> json) {
@@ -75,6 +77,7 @@ class Museum {
       reviewCount: json['review_count'] as int?,
       isKidsFriendly: json['is_kids_friendly'] as bool? ?? false,
       kidsNote: json['kids_note'] as String?,
+      kidsCategory: json['kids_category'] as String?,
     );
   }
 
@@ -102,7 +105,62 @@ class Museum {
         'review_count': reviewCount,
         'is_kids_friendly': isKidsFriendly,
         'kids_note': kidsNote,
+        'kids_category': kidsCategory,
       };
+
+  Museum copyWith({
+    String? id,
+    String? name,
+    String? type,
+    String? ownership,
+    String? region1,
+    String? region2,
+    String? address,
+    String? roadAddress,
+    double? latitude,
+    double? longitude,
+    String? phone,
+    String? homepageUrl,
+    String? openingHours,
+    String? closedDays,
+    String? admissionFee,
+    String? description,
+    String? imageUrl,
+    bool? isActive,
+    DateTime? createdAt,
+    double? averageRating,
+    int? reviewCount,
+    bool? isKidsFriendly,
+    String? kidsNote,
+    String? kidsCategory,
+  }) {
+    return Museum(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      ownership: ownership ?? this.ownership,
+      region1: region1 ?? this.region1,
+      region2: region2 ?? this.region2,
+      address: address ?? this.address,
+      roadAddress: roadAddress ?? this.roadAddress,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      phone: phone ?? this.phone,
+      homepageUrl: homepageUrl ?? this.homepageUrl,
+      openingHours: openingHours ?? this.openingHours,
+      closedDays: closedDays ?? this.closedDays,
+      admissionFee: admissionFee ?? this.admissionFee,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      averageRating: averageRating ?? this.averageRating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      isKidsFriendly: isKidsFriendly ?? this.isKidsFriendly,
+      kidsNote: kidsNote ?? this.kidsNote,
+      kidsCategory: kidsCategory ?? this.kidsCategory,
+    );
+  }
 
   /// 무료 여부
   bool get isFree {
@@ -138,6 +196,15 @@ class Museum {
         return '🏺';
     }
   }
+
+  /// 어린이 전용 박물관 (dedicated)
+  bool get isKidsDedicated => kidsCategory == 'dedicated';
+
+  /// 어린이 친화 박물관 (friendly)
+  bool get isKidsFriendlyTagged => kidsCategory == 'friendly';
+
+  /// 어린이 태그 존재 여부
+  bool get hasKidsTag => kidsCategory != null;
 
   /// null/빈값 → "정보 없음" 헬퍼
   static String orEmpty(String? value) =>

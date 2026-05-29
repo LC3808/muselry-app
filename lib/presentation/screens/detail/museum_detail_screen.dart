@@ -275,11 +275,20 @@ class _BadgeRow extends StatelessWidget {
           ),
         if (museum.region1.isNotEmpty)
           _Badge(label: museum.region1, color: Colors.blueGrey),
-        // Day 9: 어린이 친화 배지
-        if (museum.isKidsFriendly)
+        // kidsCategory 기반 어린이 태그 (T4 사이클1)
+        if (museum.isKidsDedicated)
           _Badge(
-            label: '👶 어린이 친화',
-            color: const Color(0xFF27AE60),
+            label: '어린이 전용',
+            color: const Color(0xFFD4622A),
+            textColor: Colors.white,
+            fontSize: 13,
+          )
+        else if (museum.isKidsFriendlyTagged)
+          _Badge(
+            label: '어린이 친화',
+            color: const Color(0xFFF5E6D3),
+            textColor: const Color(0xFF6D4C41),
+            fontSize: 13,
           ),
       ],
     );
@@ -302,22 +311,37 @@ class _BadgeRow extends StatelessWidget {
 class _Badge extends StatelessWidget {
   final String label;
   final Color color;
-  const _Badge({required this.label, required this.color});
+  final Color? textColor;
+  final double? fontSize;
+  const _Badge({
+    required this.label,
+    required this.color,
+    this.textColor,
+    this.fontSize,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveTextColor = textColor ?? color;
+    final effectiveBgColor = textColor != null
+        ? color  // 직접 배경색 지정 시 그대로 사용
+        : color.withValues(alpha: 0.12);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: effectiveBgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: textColor != null
+              ? color.withValues(alpha: 0.0)
+              : color.withValues(alpha: 0.3),
+        ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: color,
-          fontSize: 12,
+          color: effectiveTextColor,
+          fontSize: fontSize ?? 12,
           fontWeight: FontWeight.w600,
         ),
       ),

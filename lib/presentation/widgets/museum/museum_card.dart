@@ -90,6 +90,19 @@ class MuseumCard extends StatelessWidget {
                                 label: museum.ownershipLabel,
                                 color: _ownershipColor(museum.ownershipLabel),
                               ),
+                            // 어린이 태그 (kidsCategory 기반)
+                            if (museum.isKidsDedicated)
+                              const _TagChip(
+                                text: '어린이 전용',
+                                bgColor: Color(0xFFD4622A),
+                                textColor: Colors.white,
+                              )
+                            else if (museum.isKidsFriendlyTagged)
+                              const _TagChip(
+                                text: '어린이 친화',
+                                bgColor: Color(0xFFF5E6D3),
+                                textColor: Color(0xFF6D4C41),
+                              ),
                           ],
                         ),
                       ),
@@ -241,6 +254,37 @@ class MuseumCard extends StatelessWidget {
       default:
         return Colors.grey;
     }
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  final String text;
+  final Color? bgColor;
+  final Color? textColor;
+
+  const _TagChip({
+    required this.text,
+    this.bgColor,
+    this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor ?? const Color(0xFFF5E6D3),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: textColor ?? const Color(0xFF6D4C41),
+        ),
+      ),
+    );
   }
 }
 
