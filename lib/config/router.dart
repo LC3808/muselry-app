@@ -17,6 +17,8 @@ import '../presentation/screens/mypage/mypage_screen.dart';
 import '../presentation/screens/visit/visit_history_screen.dart';
 import '../presentation/screens/review/review_screen.dart';
 import '../presentation/screens/review/my_reviews_screen.dart';
+import '../presentation/screens/notification/notification_screen.dart';
+import '../presentation/screens/feedback/feedback_screen.dart';
 import '../presentation/widgets/common/main_scaffold.dart';
 
 // 라우트 경로 상수
@@ -36,6 +38,8 @@ class AppRoutes {
   static const String myReviews = '/my-reviews';
   static const String mypageMap = '/mypage/map';
   static const String bookmarks = '/mypage/bookmarks';
+  static const String notifications = '/notifications';
+  static const String feedback = '/feedback';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -165,6 +169,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.bookmarks,
         builder: (context, state) => const BookmarksScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        builder: (context, state) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.feedback,
+        builder: (context, state) => const FeedbackScreen(),
       ),
     ],
   );
