@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,7 @@ import '../../providers/review_provider.dart';
 import '../../../core/errors/auth_required_exception.dart';
 import '../../../core/errors/duplicate_visit_exception.dart';
 import '../museum/visit_add_dialog.dart';
+import '../../widgets/museum/museum_image.dart';
 
 class MuseumDetailScreen extends ConsumerWidget {
   final String museumId;
@@ -53,15 +53,15 @@ class _DetailBody extends ConsumerWidget {
           backgroundColor: const Color(0xFF2C3E50),
           iconTheme: const IconThemeData(color: Colors.white),
           flexibleSpace: FlexibleSpaceBar(
-            background: museum.imageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: museum.imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => _ImagePlaceholder(museum: museum),
-                    errorWidget: (_, __, ___) =>
-                        _ImagePlaceholder(museum: museum),
-                  )
-                : _ImagePlaceholder(museum: museum),
+            // M2: MuseumImage 공용 위젯 사용 (dedicated 우선 fallback)
+            background: MuseumImage(
+              imageUrl: museum.imageUrl,
+              type: museum.type,
+              kidsCategory: museum.kidsCategory,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 240,
+            ),
           ),
           actions: [
             IconButton(
@@ -249,37 +249,6 @@ class _DetailBody extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─── 이미지 Placeholder ────────────────────────────────────────────────────────
-
-class _ImagePlaceholder extends StatelessWidget {
-  final Museum museum;
-  const _ImagePlaceholder({required this.museum});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF2C3E50).withValues(alpha: 0.85),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(museum.typeIcon, style: const TextStyle(fontSize: 56)),
-            const SizedBox(height: 10),
-            Text(
-              museum.typeLabel,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

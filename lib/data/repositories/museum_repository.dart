@@ -1,10 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/models/museum.dart';
+import '../../presentation/providers/museum_provider.dart';
 
 class MuseumRepository {
   final SupabaseClient _client = Supabase.instance.client;
 
-  /// 전체 박물관 목록 조회 (검색 + 필터 지원)
+  /// 전체 박물관 목록 조회 (검색 + 필터 + 정렬 지원)
+  ///
+  /// M3 정렬 기준:
+  /// - relevance: 검색어 있을 때 관련도(name 우선), 없으면 name ASC
+  /// - distance:  위치 기반 거리순 (DB 지원 없어 name ASC fallback)
+  /// - popularity: static_visitor_count DESC (NULL last)
+  /// - rating:    bayesian_score DESC, review_count DESC (리뷰 0건 하단)
   Future<List<Museum>> fetchMuseums({
     String? searchQuery,
     String? region,
@@ -14,6 +21,8 @@ class MuseumRepository {
     bool? isKidsFriendly,
     /// 무료 관람 필터 (v1.9 이슈 7): true이면 is_free=true 조건 추가
     bool? isFree,
+    /// M3: 정렬 기준
+    SortOrder sortOrder = SortOrder.relevance,
     int limit = 20,
     int offset = 0,
   }) async {
@@ -40,7 +49,6 @@ class MuseumRepository {
     }
 
     // v1.8: 운영 필터 (공공/민간 그룹핑 → DB ownership 원본 값 매핑)
-    // DB에는 국립/공립/사립/대학/기업 원본 값 유지, UI에서만 그룹핑
     if (ownership != null && ownership != '전체') {
       if (ownership == '공공') {
         query = query.inFilter('ownership', ['국립', '공립']);
@@ -49,21 +57,48 @@ class MuseumRepository {
       }
     }
 
-    // T4 사이클 1.5: kids_category 기준으로 통일 (is_kids_friendly 폐지, 모델 필드는 DB 호환 유지)
+    // T4 사이클 1.5: kids_category 기준으로 통일
     if (isKidsFriendly == true) {
       query = query.not('kids_category', 'is', null);
     }
 
-    // v1.9: 무료 관람 필터 (is_free 콼럼 기반)
+    // v1.9: 무료 관람 필터
     if (isFree == true) {
       query = query.eq('is_free', true);
     }
 
-    final response = await query
-        .order('name', ascending: true)
-        .range(offset, offset + limit - 1);
+    // M3: 정렬 기준 적용 — order()는 PostgrestFilterBuilder에서 호출하면 PostgrestTransformBuilder 반환
+    // 따라서 모든 filter 조건 적용 후 마지막에 order+range 체이닝
+    final List<Museum> result;
 
-    return (response as List).map((e) => Museum.fromJson(e)).toList();
+    switch (sortOrder) {
+      case SortOrder.rating:
+        final response = await query
+            .order('bayesian_score', ascending: false, nullsFirst: false)
+            .order('review_count', ascending: false, nullsFirst: false)
+            .order('average_rating', ascending: false, nullsFirst: false)
+            .order('name', ascending: true)
+            .range(offset, offset + limit - 1);
+        result = (response as List).map((e) => Museum.fromJson(e)).toList();
+        break;
+      case SortOrder.popularity:
+        final response = await query
+            .order('static_popularity_rank', ascending: true, nullsFirst: false)
+            .order('static_visitor_count', ascending: false, nullsFirst: false)
+            .order('name', ascending: true)
+            .range(offset, offset + limit - 1);
+        result = (response as List).map((e) => Museum.fromJson(e)).toList();
+        break;
+      case SortOrder.distance:
+      case SortOrder.relevance:
+        final response = await query
+            .order('name', ascending: true)
+            .range(offset, offset + limit - 1);
+        result = (response as List).map((e) => Museum.fromJson(e)).toList();
+        break;
+    }
+
+    return result;
   }
 
   /// 박물관 상세 조회
@@ -95,7 +130,6 @@ class MuseumRepository {
         .map((e) => e['region_1'] as String)
         .toSet();
 
-    // 지정된 순서로 정렬, 목록에 없는 지역은 뒤에 추가
     final ordered = [
       ..._regionOrder.where((r) => dbRegions.contains(r)),
       ...dbRegions.where((r) => !_regionOrder.contains(r)).toList()..sort(),
@@ -105,10 +139,6 @@ class MuseumRepository {
   }
 
   /// ID 목록으로 박물관 일괄 조회 (북마크 목록 등에서 사용)
-  ///
-  /// [설계 근거]
-  /// Supabase PostgREST에서 IN 필터는 `.in_('id', ids)` 사용.
-  /// ids가 비어 있으면 빈 리스트 반환 (불필요한 API 호출 방지).
   Future<List<Museum>> fetchMuseumsByIds(List<String> ids) async {
     if (ids.isEmpty) return [];
 
@@ -122,11 +152,7 @@ class MuseumRepository {
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 
-  /// 인기 장소 조회 (v1.9 이슈 3: 정적 랜킹 우선, NULL은 average_rating 기준 후순위)
-  ///
-  /// 정렬 우선순위:
-  ///   1. static_popularity_rank ASC (NULL last) — 통계청 방문객 기반 정적 순위
-  ///   2. average_rating DESC (NULL last) — 리뷰 평점 기반 폴백
+  /// 인기 장소 조회 (v1.9 이슈 3: 정적 랭킹 우선, NULL은 average_rating 기준 후순위)
   Future<List<Museum>> fetchPopularMuseums({int limit = 10}) async {
     final response = await _client
         .from('museums')
@@ -148,6 +174,25 @@ class MuseumRepository {
         .not('longitude', 'is', null)
         .order('name', ascending: true)
         .limit(1000);
+    return (response as List).map((e) => Museum.fromJson(e)).toList();
+  }
+
+  /// 지도용 검색 결과 조회 (M4: 지도 탭 내 검색)
+  Future<List<Museum>> searchForMap(String query) async {
+    if (query.trim().isEmpty) return [];
+    final q = query.trim();
+    final sanitized = q.length > 50 ? q.substring(0, 50) : q;
+
+    final response = await _client
+        .from('museums')
+        .select()
+        .eq('is_active', true)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .or('name.ilike.%$sanitized%,address.ilike.%$sanitized%,region_1.ilike.%$sanitized%')
+        .order('name', ascending: true)
+        .limit(50);
+
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 }

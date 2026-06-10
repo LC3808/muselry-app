@@ -7,6 +7,13 @@ final museumRepositoryProvider = Provider<MuseumRepository>((ref) {
   return MuseumRepository();
 });
 
+/// M3: 정렬 기준 열거형
+/// - relevance: 관련도 (검색어 있을 때 1차, 없으면 거리 fallback)
+/// - distance:  거리순 (위치 허용 시)
+/// - popularity: 인기순 (static_visitor_count)
+/// - rating:    별점순 (bayesian_score DESC)
+enum SortOrder { relevance, distance, popularity, rating }
+
 // ─── 검색/필터 상태 ─────────────────────────────────────────────────────────
 class ExploreFilter {
   final String searchQuery;
@@ -18,6 +25,8 @@ class ExploreFilter {
   final bool isKidsFriendly;
   /// 추천 태그: 무료 관람 (v1.9 이슈 7)
   final bool isFree;
+  /// M3: 정렬 기준
+  final SortOrder sortOrder;
 
   const ExploreFilter({
     this.searchQuery = '',
@@ -26,6 +35,7 @@ class ExploreFilter {
     this.selectedOwnership = '전체',
     this.isKidsFriendly = false,
     this.isFree = false,
+    this.sortOrder = SortOrder.relevance,
   });
 
   ExploreFilter copyWith({
@@ -35,6 +45,7 @@ class ExploreFilter {
     String? selectedOwnership,
     bool? isKidsFriendly,
     bool? isFree,
+    SortOrder? sortOrder,
   }) {
     return ExploreFilter(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -43,6 +54,7 @@ class ExploreFilter {
       selectedOwnership: selectedOwnership ?? this.selectedOwnership,
       isKidsFriendly: isKidsFriendly ?? this.isKidsFriendly,
       isFree: isFree ?? this.isFree,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -83,6 +95,11 @@ class ExploreFilterNotifier extends StateNotifier<ExploreFilter> {
   /// 무료 관람 필터 설정 (v1.9)
   void setFree(bool value) {
     state = state.copyWith(isFree: value);
+  }
+
+  /// M3: 정렬 기준 설정
+  void setSortOrder(SortOrder order) {
+    state = state.copyWith(sortOrder: order);
   }
 
   void reset() {
@@ -142,6 +159,7 @@ class MuseumListNotifier extends StateNotifier<MuseumListState> {
     String? ownership,
     bool? isKidsFriendly,
     bool? isFree,
+    SortOrder sortOrder = SortOrder.relevance,
   }) async {
     state = const MuseumListState(isLoading: true);
     try {
@@ -152,6 +170,7 @@ class MuseumListNotifier extends StateNotifier<MuseumListState> {
         ownership: ownership,
         isKidsFriendly: isKidsFriendly,
         isFree: isFree,
+        sortOrder: sortOrder,
         limit: _pageSize,
         offset: 0,
       );
@@ -177,6 +196,7 @@ class MuseumListNotifier extends StateNotifier<MuseumListState> {
     String? ownership,
     bool? isKidsFriendly,
     bool? isFree,
+    SortOrder sortOrder = SortOrder.relevance,
   }) async {
     if (state.isLoading || !state.hasMore) return;
 
@@ -189,6 +209,7 @@ class MuseumListNotifier extends StateNotifier<MuseumListState> {
         ownership: ownership,
         isKidsFriendly: isKidsFriendly,
         isFree: isFree,
+        sortOrder: sortOrder,
         limit: _pageSize,
         offset: state.currentOffset,
       );
