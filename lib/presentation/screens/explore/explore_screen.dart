@@ -138,7 +138,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
 
-          // ─── 지역 필터 ──────────────────────────────────────────────────
+          // ─── R2: 지역 필터 (순서: 지역 → 유형 → 운영(MVP숨김) → 추천태그) ───
           SliverToBoxAdapter(
             child: regionsAsync.when(
               data: (regions) => _RegionFilterBar(
@@ -154,7 +154,70 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
 
-          // ─── v1.8: 추천 태그 줄 ──────────────────────────────────────
+          // ─── R2: 유형 필터 ────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '유형',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[500],
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: _typeFilters.map((t) {
+                      final isSelected = filter.selectedType == t;
+                      return ChoiceChip(
+                        label: Text(t),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          ref.read(exploreFilterProvider.notifier).setType(t);
+                          _onFilterChanged();
+                        },
+                        selectedColor: const Color(0xFF2C3E50).withValues(alpha: 0.12),
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? const Color(0xFF2C3E50)
+                              : Colors.grey[600],
+                          fontSize: 13,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: isSelected
+                                ? const Color(0xFF2C3E50)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  // R3: 공공/민간(ownership) 필터 UI MVP 숨김
+                  // TODO: 출시 후 ownership 전수조사 완료 시 아래 주석 해제
+                  // Text('운영', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[500], letterSpacing: 0.3)),
+                  // const SizedBox(height: 6),
+                  // Wrap(spacing: 8, children: _ownershipFilters.map((o) { ... }).toList()),
+                  // const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+
+          // ─── R2: 추천 태그 ────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -237,108 +300,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // ─── 유형 필터 + 운영 필터 ─────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '유형',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[500],
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    children: _typeFilters.map((t) {
-                      final isSelected = filter.selectedType == t;
-                      return ChoiceChip(
-                        label: Text(t),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          ref.read(exploreFilterProvider.notifier).setType(t);
-                          _onFilterChanged();
-                        },
-                        selectedColor: const Color(0xFF2C3E50).withValues(alpha: 0.12),
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? const Color(0xFF2C3E50)
-                              : Colors.grey[600],
-                          fontSize: 13,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: isSelected
-                                ? const Color(0xFF2C3E50)
-                                : Colors.grey.shade300,
-                          ),
-                        ),
-                        backgroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '운영',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[500],
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    children: _ownershipFilters.map((o) {
-                      final isSelected = filter.selectedOwnership == o;
-                      return ChoiceChip(
-                        label: Text(o),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          ref.read(exploreFilterProvider.notifier).setOwnership(o);
-                          _onFilterChanged();
-                        },
-                        selectedColor: const Color(0xFF6A1B9A).withValues(alpha: 0.12),
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? const Color(0xFF6A1B9A)
-                              : Colors.grey[600],
-                          fontSize: 13,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: isSelected
-                                ? const Color(0xFF6A1B9A)
-                                : Colors.grey.shade300,
-                          ),
-                        ),
-                        backgroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 8),
                 ],
               ),
             ),
