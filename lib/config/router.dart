@@ -18,6 +18,7 @@ import '../presentation/screens/visit/visit_history_screen.dart';
 import '../presentation/screens/review/review_screen.dart';
 import '../presentation/screens/review/my_reviews_screen.dart';
 import '../presentation/screens/notification/notification_screen.dart';
+import '../presentation/screens/review/review_detail_screen.dart';
 import '../presentation/screens/feedback/feedback_screen.dart';
 import '../presentation/widgets/common/main_scaffold.dart';
 
@@ -40,6 +41,7 @@ class AppRoutes {
   static const String bookmarks = '/mypage/bookmarks';
   static const String notifications = '/notifications';
   static const String feedback = '/feedback';
+  static const String reviewDetail = '/reviews/:reviewId';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -177,6 +179,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.feedback,
         builder: (context, state) => const FeedbackScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.reviewDetail,
+        builder: (context, state) {
+          final reviewId = state.pathParameters['reviewId']!;
+          return ReviewDetailScreen(reviewId: reviewId);
+        },
       ),
     ],
   );

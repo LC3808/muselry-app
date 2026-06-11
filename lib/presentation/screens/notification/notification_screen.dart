@@ -99,11 +99,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           .read(notificationNotifierProvider.notifier)
           .markAsRead(notification.id);
     }
-    // 해당 리뷰로 이동 (리뷰 ID가 있을 때만)
+    // R5: 리뷰 ID 있으면 단일 리뷰 화면으로 직접 이동 (/reviews/:reviewId)
     if (notification.reviewId != null) {
-      context.pop();
-      // 리뷰 화면으로 이동 — museum_id가 없으므로 community 탭으로 이동
-      // 추후 notifications 테이블에 museum_id 조인 추가 시 직접 이동 가능
+      context.push('/reviews/${notification.reviewId}');
     }
   }
 }

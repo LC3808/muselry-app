@@ -22,7 +22,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   // v1.9: 유형 필터 (기념관/전시관 제외)
   static const _typeFilters = ['전체', '박물관', '미술관', '과학관'];
   // v1.8: 운영 필터 (공공=국립+공립, 민간=사립+대학+기업)
-  static const _ownershipFilters = ['전체', '공공', '민간'];
+  // R3: ownership 필터 UI MVP 숨김 — 상수도 주석 처리
+  // static const _ownershipFilters = ['전체', '공공', '민간'];
 
   @override
   void initState() {
