@@ -218,7 +218,7 @@ class MuseumRepository {
   }
 
   /// 지도용 검색 결과 조회 (M4: 지도 탭 내 검색)
-  Future<List<Museum>> searchForMap(String query) async {
+  Future<List<Museum>> searchForMap(String query, {int limit = 50}) async {
     if (query.trim().isEmpty) return [];
     final q = query.trim();
     final sanitized = q.length > 50 ? q.substring(0, 50) : q;
@@ -231,7 +231,7 @@ class MuseumRepository {
         .not('longitude', 'is', null)
         .or('name.ilike.%$sanitized%,address.ilike.%$sanitized%,region_1.ilike.%$sanitized%')
         .order('name', ascending: true)
-        .limit(50);
+        .limit(limit);
 
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }

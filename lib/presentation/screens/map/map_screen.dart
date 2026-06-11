@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,14 @@ import '../../providers/museum_provider.dart';
 // 앱 색상 상수
 const _kNavy = Color(0xFF2C3E50);
 const _kGold = Color(0xFFB8860B);
+
+// R4-2: type별 마커 색상 (범례와 1:1 일치)
+const _kColorMuseum = _kGold;
+const _kColorArt = Color(0xFF7C4DFF);
+const _kColorScience = Color(0xFFE65100);
+const _kColorMemorial = Color(0xFF00897B);
+const _kColorExhibit = Color(0xFF1565C0);
+const _kColorDefault = _kNavy;
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -36,6 +45,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   List<Museum> _searchResults = [];
   bool _isSearching = false;
   bool _searchActive = false; // 검색 모드 활성화 여부
+
+  // R9+R10: 패널 표시 여부 (검색어/마커는 유지하면서 패널만 접기)
+  bool _panelVisible = true;
+
+  // R4-2: 커스텀 마커 아이콘 캐시 (type → NOverlayImage)
+  final Map<String, NOverlayImage?> _markerIconCache = {};
 
   @override
   void initState() {
@@ -78,6 +93,41 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
     } catch (_) {
       // 위치 실패 시 서울 기본값 유지
+    }
+  }
+
+  // R4-2: type별 커스텀 마커 아이콘 생성 (색상 원형)
+  Future<NOverlayImage?> _getMarkerIcon(String? type) async {
+    final key = type ?? 'default';
+    if (_markerIconCache.containsKey(key)) return _markerIconCache[key];
+
+    final color = _typeColor(type);
+    try {
+      final icon = await NOverlayImage.fromWidget(
+        widget: Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+        size: const Size(18, 18),
+        context: context,
+      );
+      _markerIconCache[key] = icon;
+      return icon;
+    } catch (_) {
+      _markerIconCache[key] = null;
+      return null;
     }
   }
 
@@ -144,8 +194,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       for (final museum in museums) {
         if (museum.latitude == null || museum.longitude == null) continue;
 
-        final color = _typeColor(museum.type);
-        final marker = NMarker(
+        // R4-2: 커스텀 원형 아이콘 사용
+        final icon = await _getMarkerIcon(museum.type);
+        if (_isDisposed || !mounted || generation != _markerDrawGeneration) return;
+
+        final markerBuilder = NMarker(
           id: museum.id,
           position: NLatLng(museum.latitude!, museum.longitude!),
           caption: NOverlayCaption(
@@ -154,15 +207,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             color: _kNavy,
             haloColor: Colors.white,
           ),
-          iconTintColor: color,
-          size: const Size(24, 24),
+          size: const Size(18, 18),
         );
 
-        marker.setOnTapListener((_) {
+        if (icon != null) {
+          markerBuilder.setIcon(icon);
+        } else {
+          // fallback: iconTintColor
+          markerBuilder.setIconTintColor(_typeColor(museum.type));
+        }
+
+        markerBuilder.setOnTapListener((_) {
           context.push('/museum/${museum.id}');
         });
 
-        markers.add(marker);
+        markers.add(markerBuilder);
       }
 
       if (markers.isEmpty) return;
@@ -196,12 +255,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() {
       _isSearching = true;
       _searchActive = true;
+      _panelVisible = true; // 새 검색 시 패널 다시 열기
     });
     _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
       if (!mounted || _isDisposed) return;
       try {
         final repo = ref.read(museumRepositoryProvider);
-        final results = await repo.searchForMap(value);
+        final results = await repo.searchForMap(value, limit: 50); // R9: 최대 50건
         if (!mounted || _isDisposed) return;
         setState(() {
           _searchResults = results;
@@ -237,7 +297,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       for (final museum in results) {
         if (museum.latitude == null || museum.longitude == null) continue;
 
-        final color = _typeColor(museum.type);
+        // R4-2: 커스텀 원형 아이콘 사용
+        final icon = await _getMarkerIcon(museum.type);
+        if (_isDisposed || !mounted || generation != _markerDrawGeneration) return;
+
         final marker = NMarker(
           id: museum.id,
           position: NLatLng(museum.latitude!, museum.longitude!),
@@ -247,9 +310,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             color: _kNavy,
             haloColor: Colors.white,
           ),
-          iconTintColor: color,
-          size: const Size(28, 28),
+          size: const Size(22, 22),
         );
+
+        if (icon != null) {
+          marker.setIcon(icon);
+        } else {
+          marker.setIconTintColor(_typeColor(museum.type));
+        }
 
         marker.setOnTapListener((_) {
           context.push('/museum/${museum.id}');
@@ -298,6 +366,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _searchResults = [];
       _isSearching = false;
       _searchActive = false;
+      _panelVisible = true;
     });
     // 전체 마커 재그리기
     _lastDrawnCount = -1;
@@ -305,20 +374,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     museumsAsync.whenData((museums) => _addMuseumMarkers(museums));
   }
 
+  // R10: 패널만 닫기 (검색어/마커 유지)
+  void _dismissPanel() {
+    setState(() => _panelVisible = false);
+    _searchFocusNode.unfocus();
+  }
+
+  // R4-2: type별 색상 (범례와 1:1)
   Color _typeColor(String? type) {
     switch (type) {
       case '박물관':
-        return _kGold;
+        return _kColorMuseum;
       case '미술관':
-        return const Color(0xFF7C4DFF);
-      case '기념관':
-        return const Color(0xFF00897B);
-      case '전시관':
-        return const Color(0xFF1565C0);
+        return _kColorArt;
       case '과학관':
-        return const Color(0xFFE65100);
+        return _kColorScience;
+      case '기념관':
+        return _kColorMemorial;
+      case '전시관':
+        return _kColorExhibit;
       default:
-        return _kNavy;
+        return _kColorDefault;
     }
   }
 
@@ -330,16 +406,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       body: Stack(
         children: [
           // ─── 지도 ──────────────────────────────────────────────────────
-          NaverMap(
-            options: NaverMapViewOptions(
-              initialCameraPosition: NCameraPosition(
-                target: _initialPosition,
-                zoom: 11,
+          // R10: 지도 영역 탭 시 패널 닫기
+          GestureDetector(
+            onTap: _searchActive && _panelVisible ? _dismissPanel : null,
+            behavior: HitTestBehavior.translucent,
+            child: NaverMap(
+              options: NaverMapViewOptions(
+                initialCameraPosition: NCameraPosition(
+                  target: _initialPosition,
+                  zoom: 11,
+                ),
+                locationButtonEnable: true,
+                consumeSymbolTapEvents: false,
               ),
-              locationButtonEnable: true,
-              consumeSymbolTapEvents: false,
+              onMapReady: _onMapReady,
             ),
-            onMapReady: _onMapReady,
           ),
 
           // ─── M4: 검색바 (실제 검색 기능) ──────────────────────────────
@@ -364,8 +445,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               child: const _TypeLegend(),
             ),
 
-          // ─── M4: 검색 결과 목록 패널 ──────────────────────────────────
-          if (_searchActive && _searchResults.isNotEmpty)
+          // ─── R9+R10: 검색 결과 목록 패널 (스크롤 가능, 최대 50건) ──────
+          if (_searchActive && _searchResults.isNotEmpty && _panelVisible)
             Positioned(
               top: MediaQuery.of(context).padding.top + 68,
               left: 16,
@@ -387,6 +468,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     );
                   }
                 },
+                // R10: 패널 상단 접기 핸들
+                onDismiss: _dismissPanel,
               ),
             ),
 
@@ -426,9 +509,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 right: 0,
                 child: Center(
                   child: _searchActive
-                      ? _CountBadge(
-                          count: _searchResults.length,
-                          label: '검색 결과',
+                      ? GestureDetector(
+                          // R11: 검색 결과 배지 탭 → 탐색 화면 검색어 연동
+                          onTap: () {
+                            final query = _searchController.text.trim();
+                            if (query.isNotEmpty) {
+                              ref.read(exploreFilterProvider.notifier).setSearchQuery(query);
+                            }
+                            context.go('/explore');
+                          },
+                          child: _CountBadge(
+                            count: _searchResults.length,
+                            label: '검색 결과',
+                            tappable: true,
+                          ),
                         )
                       : _CountBadge(count: museums.length),
                 ),
@@ -461,7 +555,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                       SizedBox(width: 8),
-                      Text('박물관 불러오는 중...',
+                      Text('전시 공간 불러오는 중...',
                           style: TextStyle(fontSize: 12)),
                     ],
                   ),
@@ -529,7 +623,7 @@ class _MapSearchBar extends StatelessWidget {
         onChanged: onChanged,
         style: const TextStyle(fontSize: 14, color: _kNavy),
         decoration: InputDecoration(
-          hintText: '전시시설 검색',
+          hintText: '전시 공간 검색',
           hintStyle: TextStyle(
             color: _kNavy.withValues(alpha: 0.45),
             fontSize: 14,
@@ -564,23 +658,27 @@ class _MapSearchBar extends StatelessWidget {
   }
 }
 
-// ─── M4: 검색 결과 패널 ────────────────────────────────────────────────────────
+// ─── R9+R10: 검색 결과 패널 (스크롤 가능, 최대 50건, 접기 핸들) ──────────────
 class _SearchResultPanel extends StatelessWidget {
   final List<Museum> results;
   final ValueChanged<Museum> onTap;
   final ValueChanged<Museum> onLocate;
+  final VoidCallback onDismiss; // R10
 
   const _SearchResultPanel({
     required this.results,
     required this.onTap,
     required this.onLocate,
+    required this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
-    final displayResults = results.take(5).toList();
+    // R9: 최대 화면 높이의 45%로 패널 높이 제한 (스크롤 가능)
+    final maxHeight = MediaQuery.of(context).size.height * 0.45;
 
     return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -595,19 +693,64 @@ class _SearchResultPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ...displayResults.map((museum) => _ResultItem(
-                museum: museum,
-                onTap: () => onTap(museum),
-                onLocate: () => onLocate(museum),
-              )),
-          if (results.length > 5)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                '외 ${results.length - 5}곳 더 있습니다',
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
+          // R10: 패널 상단 접기 핸들
+          GestureDetector(
+            onTap: onDismiss,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+          // R9: 결과 수 헤더
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+            child: Row(
+              children: [
+                Text(
+                  '검색 결과 ${results.length}곳',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // R9: 스크롤 가능한 결과 목록
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: results.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final museum = results[index];
+                return _ResultItem(
+                  museum: museum,
+                  onTap: () => onTap(museum),
+                  onLocate: () => onLocate(museum),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -684,11 +827,11 @@ class _TypeLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
-      ('박물관', _kGold),
-      ('미술관', Color(0xFF7C4DFF)),
-      ('과학관', Color(0xFFE65100)),
-      ('기념관', Color(0xFF00897B)),
-      ('전시관', Color(0xFF1565C0)),
+      ('박물관', _kColorMuseum),
+      ('미술관', _kColorArt),
+      ('과학관', _kColorScience),
+      ('기념관', _kColorMemorial),
+      ('전시관', _kColorExhibit),
     ];
 
     return Container(
@@ -737,7 +880,9 @@ class _TypeLegend extends StatelessWidget {
 class _CountBadge extends StatelessWidget {
   final int count;
   final String? label;
-  const _CountBadge({required this.count, this.label});
+  // R11: 탭 가능 여부 표시 (화살표 아이콘)
+  final bool tappable;
+  const _CountBadge({required this.count, this.label, this.tappable = false});
 
   @override
   Widget build(BuildContext context) {
@@ -753,13 +898,23 @@ class _CountBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Text(
-        label != null ? '$label $count곳' : '전시시설 $count곳',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label != null ? '$label $count곳' : '전시 공간 $count곳',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          // R11: 탭 가능 배지에 화살표 아이콘
+          if (tappable) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 11),
+          ],
+        ],
       ),
     );
   }

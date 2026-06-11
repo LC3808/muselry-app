@@ -153,6 +153,24 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     final listState = ref.watch(museumListProvider);
     final regionsAsync = ref.watch(regionsProvider);
 
+    // R11: 지도 배지 탭 → 탐색 화면 검색어 동기화
+    // exploreFilterProvider.searchQuery가 외부(지도)에서 변경되면
+    // _searchController.text를 동기화하고 목록을 갱신한다.
+    ref.listen<ExploreFilter>(exploreFilterProvider, (prev, next) {
+      if (prev?.searchQuery != next.searchQuery) {
+        final newQuery = next.searchQuery;
+        if (_searchController.text != newQuery) {
+          _searchController.text = newQuery;
+          _searchController.selection = TextSelection.fromPosition(
+            TextPosition(offset: newQuery.length),
+          );
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _loadInitial();
+        });
+      }
+    });
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
