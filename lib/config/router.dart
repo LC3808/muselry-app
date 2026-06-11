@@ -184,7 +184,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.reviewDetail,
         builder: (context, state) {
           final reviewId = state.pathParameters['reviewId']!;
-          return ReviewDetailScreen(reviewId: reviewId);
+          // R13: 알림 딥링크에서 commentId 쿼리파라미터 전달
+          final commentId = state.uri.queryParameters['commentId'];
+          return ReviewDetailScreen(
+            reviewId: reviewId,
+            highlightCommentId: commentId,
+          );
         },
       ),
     ],

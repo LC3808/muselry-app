@@ -43,6 +43,26 @@ class CommentRepository {
     return (response as List).length;
   }
 
+  /// R12: 여러 리뷰의 댓글 수 일괄 조회 (N+1 방지)
+  /// 반환: { reviewId → count }
+  Future<Map<String, int>> fetchCommentCounts(List<String> reviewIds) async {
+    if (reviewIds.isEmpty) return {};
+    // Supabase PostgREST: review_id=in.(id1,id2,...) + status=eq.published
+    // group by는 PostgREST에서 직접 지원하지 않으므로
+    // id 컬럼만 가져와서 Dart에서 집계한다.
+    final response = await _client
+        .from('comments')
+        .select('review_id')
+        .inFilter('review_id', reviewIds)
+        .eq('status', 'published');
+    final counts = <String, int>{};
+    for (final row in (response as List)) {
+      final rid = row['review_id'] as String;
+      counts[rid] = (counts[rid] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   // ── 댓글 작성 ────────────────────────────────────────────────────────────
 
   /// 댓글 작성.

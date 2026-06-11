@@ -99,9 +99,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           .read(notificationNotifierProvider.notifier)
           .markAsRead(notification.id);
     }
-    // R5: 리뷰 ID 있으면 단일 리뷰 화면으로 직접 이동 (/reviews/:reviewId)
+    // R5/R13: 리뷰 ID 있으면 단일 리뷰 화면으로 직접 이동
+    // R13: commentId가 있으면 쿼리파라미터로 전달 → 하이라이트
     if (notification.reviewId != null) {
-      context.push('/reviews/${notification.reviewId}');
+      final uri = notification.commentId != null
+          ? '/reviews/${notification.reviewId}?commentId=${notification.commentId}'
+          : '/reviews/${notification.reviewId}';
+      context.push(uri);
     }
   }
 }

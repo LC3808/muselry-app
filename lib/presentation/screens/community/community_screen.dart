@@ -124,9 +124,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           if (index == state.reviews.length) {
             return const _FeedFooter();
           }
+          // R12: 현재 페이지의 리뷰 ID 목록으로 댓글 수 일괄 조회
+          final reviewIds = state.reviews.map((r) => r.id).toList();
+          final countsAsync = ref.watch(commentCountsProvider(reviewIds));
+          final counts = countsAsync.valueOrNull ?? {};
           return _ReviewFeedCard(
             review: state.reviews[index],
             currentUserId: currentUserId,
+            commentCount: counts[state.reviews[index].id],
             onMuseumTap: (museumId) => context.push(
               AppRoutes.museumDetail.replaceFirst(':id', museumId),
             ),
@@ -142,11 +147,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
 class _ReviewFeedCard extends ConsumerStatefulWidget {
   final Review review;
   final String? currentUserId;
+  final int? commentCount; // R12: 댓글 수 (일괄 조회 결과)
   final void Function(String museumId) onMuseumTap;
 
   const _ReviewFeedCard({
     required this.review,
     required this.currentUserId,
+    this.commentCount,
     required this.onMuseumTap,
   });
 
@@ -319,7 +326,8 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    _showComments ? '댓글 접기' : '댓글 보기',
+                    // R12: 댓글 수 표시 (null이면 '...' 로딩 중)
+                    _buildCommentLabel(),
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondaryColor,
@@ -339,6 +347,17 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
         ],
       ),
     );
+  }
+
+  /// R12: 댓글 토글 버튼 라벨 생성
+  String _buildCommentLabel() {
+    final count = widget.commentCount;
+    if (_showComments) {
+      return count != null ? '댓글 접기($count)' : '댓글 접기';
+    } else {
+      if (count == null) return '댓글 보기';
+      return count > 0 ? '댓글 보기($count)' : '댓글 보기';
+    }
   }
 
   static String _maskNickname(String? nickname) {

@@ -106,6 +106,17 @@ final commentListProvider =
   CommentListNotifier.new,
 );
 
+// ── R12: 댓글 수 일괄 조회 Provider ──────────────────────────────────────────────
+
+/// 리뷰 ID 목록 → { reviewId: count } 맵 (단일 쿼리, N+1 방지)
+final commentCountsProvider =
+    FutureProvider.family<Map<String, int>, List<String>>(
+  (ref, reviewIds) async {
+    final repo = ref.watch(commentRepositoryProvider);
+    return repo.fetchCommentCounts(reviewIds);
+  },
+);
+
 // ── 알림 Providers ────────────────────────────────────────────────────────────
 
 final notificationsProvider =
