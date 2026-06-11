@@ -160,20 +160,39 @@ class MuseumListNotifier extends StateNotifier<MuseumListState> {
     bool? isKidsFriendly,
     bool? isFree,
     SortOrder sortOrder = SortOrder.relevance,
+    // R1: 거리순 RPC용 좌표
+    double? lat,
+    double? lng,
   }) async {
     state = const MuseumListState(isLoading: true);
     try {
-      final museums = await _repo.fetchMuseums(
-        searchQuery: searchQuery,
-        region: region,
-        type: type,
-        ownership: ownership,
-        isKidsFriendly: isKidsFriendly,
-        isFree: isFree,
-        sortOrder: sortOrder,
-        limit: _pageSize,
-        offset: 0,
-      );
+      List<Museum> museums;
+      if (sortOrder == SortOrder.distance && lat != null && lng != null) {
+        // R1: 좌표 있으면 RPC 호출
+        museums = await _repo.fetchMuseumsByDistance(
+          lat: lat,
+          lng: lng,
+          type: type,
+          region1: region,
+          kidsOnly: isKidsFriendly ?? false,
+          isFree: isFree,
+          search: searchQuery,
+          limit: _pageSize,
+          offset: 0,
+        );
+      } else {
+        museums = await _repo.fetchMuseums(
+          searchQuery: searchQuery,
+          region: region,
+          type: type,
+          ownership: ownership,
+          isKidsFriendly: isKidsFriendly,
+          isFree: isFree,
+          sortOrder: sortOrder,
+          limit: _pageSize,
+          offset: 0,
+        );
+      }
       state = MuseumListState(
         museums: museums,
         isLoading: false,
@@ -197,22 +216,41 @@ class MuseumListNotifier extends StateNotifier<MuseumListState> {
     bool? isKidsFriendly,
     bool? isFree,
     SortOrder sortOrder = SortOrder.relevance,
+    // R1: 거리순 RPC용 좌표
+    double? lat,
+    double? lng,
   }) async {
     if (state.isLoading || !state.hasMore) return;
 
     state = state.copyWith(isLoading: true);
     try {
-      final more = await _repo.fetchMuseums(
-        searchQuery: searchQuery,
-        region: region,
-        type: type,
-        ownership: ownership,
-        isKidsFriendly: isKidsFriendly,
-        isFree: isFree,
-        sortOrder: sortOrder,
-        limit: _pageSize,
-        offset: state.currentOffset,
-      );
+      List<Museum> more;
+      if (sortOrder == SortOrder.distance && lat != null && lng != null) {
+        // R1: 거리순 페이지네이션도 RPC 호출
+        more = await _repo.fetchMuseumsByDistance(
+          lat: lat,
+          lng: lng,
+          type: type,
+          region1: region,
+          kidsOnly: isKidsFriendly ?? false,
+          isFree: isFree,
+          search: searchQuery,
+          limit: _pageSize,
+          offset: state.currentOffset,
+        );
+      } else {
+        more = await _repo.fetchMuseums(
+          searchQuery: searchQuery,
+          region: region,
+          type: type,
+          ownership: ownership,
+          isKidsFriendly: isKidsFriendly,
+          isFree: isFree,
+          sortOrder: sortOrder,
+          limit: _pageSize,
+          offset: state.currentOffset,
+        );
+      }
       state = state.copyWith(
         museums: [...state.museums, ...more],
         isLoading: false,

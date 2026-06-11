@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/museum_provider.dart';
 import '../../providers/bookmark_provider.dart';
@@ -18,6 +19,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   final _scrollController = ScrollController();
   // C4 수정: 검색 디바운싱 타이머 (350ms)
   Timer? _searchDebounce;
+
+  // R1: 위치 좌표 캐시 (거리순 RPC용)
+  double? _cachedLat;
+  double? _cachedLng;
 
   // v1.9: 유형 필터 (기념관/전시관 제외)
   static const _typeFilters = ['전체', '박물관', '미술관', '과학관'];
@@ -44,6 +49,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           isKidsFriendly: filter.isKidsFriendly ? true : null,
           isFree: filter.isFree ? true : null,
           sortOrder: filter.sortOrder,
+          lat: _cachedLat,
+          lng: _cachedLng,
         );
   }
 
@@ -61,6 +68,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             isKidsFriendly: filter.isKidsFriendly ? true : null,
             isFree: filter.isFree ? true : null,
             sortOrder: filter.sortOrder,
+            lat: _cachedLat,
+            lng: _cachedLng,
           );
     }
   }
@@ -69,6 +78,54 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitial();
     });
+  }
+
+  /// R1: 거리순 칩 탭 시 위치 권한 요청 + 좌표 획득
+  Future<void> _onDistanceSortSelected() async {
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever ||
+          perm == LocationPermission.denied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('위치 권한이 필요합니다. 설정에서 허용해주세요.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        // fallback: relevance로 복교
+        ref.read(exploreFilterProvider.notifier).setSortOrder(SortOrder.relevance);
+        _onFilterChanged();
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _cachedLat = pos.latitude;
+        _cachedLng = pos.longitude;
+      });
+      ref.read(exploreFilterProvider.notifier).setSortOrder(SortOrder.distance);
+      _onFilterChanged();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('위치를 가져오지 못했어요. 다시 시도해주세요.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      ref.read(exploreFilterProvider.notifier).setSortOrder(SortOrder.relevance);
+      _onFilterChanged();
+    }
   }
 
   // C4 수정: 검색 디바운싱 메서드
@@ -312,8 +369,18 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             child: _SortChipBar(
               current: filter.sortOrder,
               onChanged: (order) {
-                ref.read(exploreFilterProvider.notifier).setSortOrder(order);
-                _onFilterChanged();
+                if (order == SortOrder.distance) {
+                  // R1: 거리순은 위치 권한 요청 후 RPC 호출
+                  _onDistanceSortSelected();
+                } else {
+                  // 거리순 해제 시 좌표 캐시 삭제
+                  setState(() {
+                    _cachedLat = null;
+                    _cachedLng = null;
+                  });
+                  ref.read(exploreFilterProvider.notifier).setSortOrder(order);
+                  _onFilterChanged();
+                }
               },
             ),
           ),

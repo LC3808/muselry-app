@@ -90,6 +90,13 @@ class MuseumRepository {
         result = (response as List).map((e) => Museum.fromJson(e)).toList();
         break;
       case SortOrder.distance:
+        // R1: RPC 호출 전 fallback 안전망 (lat/lng 없으면 relevance로 fallback)
+        // 실제 distance 호출은 fetchMuseumsByDistance() 사용
+        final response = await query
+            .order('name', ascending: true)
+            .range(offset, offset + limit - 1);
+        result = (response as List).map((e) => Museum.fromJson(e)).toList();
+        break;
       case SortOrder.relevance:
         final response = await query
             .order('name', ascending: true)
@@ -99,6 +106,39 @@ class MuseumRepository {
     }
 
     return result;
+  }
+
+  /// R1: 거리순 RPC 호출 (museums_by_distance)
+  ///
+  /// 운영자가 적용한 RPC를 호출하여 하버사인 거리 오름차순으로 반환.
+  /// RETURNS SETOF museums 이므로 기존 Museum.fromJson 그대로 파싱 가능.
+  Future<List<Museum>> fetchMuseumsByDistance({
+    required double lat,
+    required double lng,
+    String? type,
+    String? region1,
+    String? region2,
+    bool kidsOnly = false,
+    bool? isFree,
+    String? search,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final params = <String, dynamic>{
+      'p_lat': lat,
+      'p_lng': lng,
+      'p_limit': limit,
+      'p_offset': offset,
+    };
+    if (type != null) params['p_type'] = type;
+    if (region1 != null) params['p_region_1'] = region1;
+    if (region2 != null) params['p_region_2'] = region2;
+    if (kidsOnly) params['p_kids_only'] = true;
+    if (isFree != null) params['p_is_free'] = isFree;
+    if (search != null && search.isNotEmpty) params['p_search'] = search;
+
+    final response = await _client.rpc('museums_by_distance', params: params);
+    return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 
   /// 박물관 상세 조회
