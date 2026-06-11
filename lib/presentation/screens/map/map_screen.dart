@@ -529,7 +529,7 @@ class _MapSearchBar extends StatelessWidget {
         onChanged: onChanged,
         style: const TextStyle(fontSize: 14, color: _kNavy),
         decoration: InputDecoration(
-          hintText: '박물관·미술관 검색',
+          hintText: '전시시설 검색',
           hintStyle: TextStyle(
             color: _kNavy.withValues(alpha: 0.45),
             fontSize: 14,
@@ -687,6 +687,8 @@ class _TypeLegend extends StatelessWidget {
       ('박물관', _kGold),
       ('미술관', Color(0xFF7C4DFF)),
       ('과학관', Color(0xFFE65100)),
+      ('기념관', Color(0xFF00897B)),
+      ('전시관', Color(0xFF1565C0)),
     ];
 
     return Container(
@@ -752,7 +754,7 @@ class _CountBadge extends StatelessWidget {
         ],
       ),
       child: Text(
-        label != null ? '$label $count곳' : '박물관·미술관 $count곳',
+        label != null ? '$label $count곳' : '전시시설 $count곳',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 13,
