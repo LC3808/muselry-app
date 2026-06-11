@@ -240,3 +240,56 @@ CREATE POLICY "feedback_select_own" ON feedback
 | M7 마이페이지 재구성 + 레벨 뱃지 | 출시 포함 확정 후 착수 |
 | 댓글 푸시 알림 | 출시 후 (인앱 알림만 MVP) |
 | 내가 쓴 리뷰 화면 | 준비 중 배지 유지 |
+
+---
+
+## QA 라운드 1 수정 (R1~R8) — 2026-06-11
+
+| 커밋 | 내용 |
+|---|---|
+| `5a2d5ec` | feat(R1): distance sort RPC, location permission + fallback |
+| `9a3b208` | feat(R2-R6+R8): filter reorder, ownership hidden, R5 review deeplink, R6 feedback tabs, R8 asset guards |
+| `3a5e2f6` | chore(R8): .gitattributes, check_assets.sh, ios: false |
+| `e6582d5` | fix(R2+R3+R7): filter order, ownership UI hidden, comment delete state verified |
+
+### R1 — 거리순 RPC 연동
+- `museum_repository.dart`: `fetchMuseumsByDistance()` (RPC `museums_by_distance`)
+- `museum_provider.dart`: `loadInitial/loadMore`에 `lat/lng` 파라미터 + distance 분기
+- `explore_screen.dart`: 거리순 칩 탭 → Geolocator 권한 요청 → 허용 시 RPC, 거부 시 스낵바 + relevance fallback
+
+### R2 — 필터 UI 순서: 지역 → 유형 → 추천태그
+
+### R3 — ownership 필터 UI 숨김 (코드 보존, 주석 처리)
+
+### R4 — 과학관 마커 (DB 데이터 문제 — 운영자 확인 필요)
+```sql
+SELECT id, name, type FROM museums
+WHERE name ILIKE '%과학관%' OR name ILIKE '%과천%' OR name ILIKE '%별마로%';
+```
+
+### R5 — 알림 딥링크 → 단일 리뷰 화면
+- `review_detail_screen.dart` 신규 (`/reviews/:reviewId`)
+- `review_repository.dart`: `fetchReviewById()` 추가
+- `notification_screen.dart`: `context.push('/reviews/${reviewId}')` 연결
+
+### R6 — 문의/건의 탭 2개 ([문의하기] [내 문의 내역])
+- `feedback_screen.dart` 전면 재작성
+- `feedback_repository.dart`: `fetchMyFeedback()` 추가
+
+### R7 — 댓글 삭제 후 즉시 갱신 (코드 이미 정상 — 변경 없음)
+
+### R8 — 자산 안전장치
+- `.gitattributes`: `*.png binary` 등
+- `flutter_launcher_icons.yaml`: `ios: false`
+- `scripts/check_assets.sh`: 0바이트 검사
+
+### flutter analyze
+```
+No issues found! (ran in 6.3s)
+```
+
+### check_assets.sh
+```
+Checking zero-byte files...
+Asset check passed.
+```
