@@ -74,8 +74,11 @@ class CommentListNotifier extends Notifier<CommentListState> {
     state = state.copyWith(
       comments: [...state.comments, comment],
     );
-    // 알림 뱃지 갱신
+    // 알림 밿지 갱신
     ref.invalidate(unreadNotificationCountProvider);
+    // R22 fix: 커뮤니티 피드 ↔ 시설 리뷰 목록 댓글 수 동기화
+    // commentCountsProvider는 family이므로 invalidate 시 모든 인스턴스 새로고침
+    ref.invalidate(commentCountsProvider);
   }
 
   Future<void> editComment({
@@ -98,6 +101,8 @@ class CommentListNotifier extends Notifier<CommentListState> {
     state = state.copyWith(
       comments: state.comments.where((c) => c.id != commentId).toList(),
     );
+    // R22 fix: 댓글 삭제 후 커뮤니티 피드 ↔ 시설 리뷰 목록 댓글 수 동기화
+    ref.invalidate(commentCountsProvider);
   }
 }
 
