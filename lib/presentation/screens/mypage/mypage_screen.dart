@@ -1,3 +1,4 @@
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,8 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../config/router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/comment_provider.dart'; // unreadNotificationCountProvider
 import '../../providers/bookmark_provider.dart';
-import '../../providers/comment_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/visit_provider.dart';
 
@@ -25,7 +26,7 @@ class MypageScreen extends ConsumerWidget {
         title: const Text('마이페이지'),
         backgroundColor: AppTheme.surfaceColor,
         actions: [
-          // M5: 알림 버튼 + 빨간 점 뱃지
+          // 알림 버튼 + 빨간 점 뱃지
           Consumer(
             builder: (context, ref, _) {
               final unreadAsync =
@@ -72,18 +73,24 @@ class MypageScreen extends ConsumerWidget {
             ref.invalidate(profileProvider);
             ref.invalidate(myVisitsProvider);
             ref.invalidate(bookmarkedMuseumsProvider);
+            ref.invalidate(bookmarksProvider);
           },
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 16),
             children: const [
+              // §1: 프로필 영역
               _ProfileSection(),
               SizedBox(height: 12),
-              _StatsSection(),
+              // §1: 나의 문화 지도 카드 (첫 번째 핵심 카드)
+              _CultureMapCard(),
               SizedBox(height: 12),
+              // §1: 내 방문 기록 카드 (레벨 + 통계)
+              _VisitStatsCard(),
+              SizedBox(height: 12),
+              // §1: 북마크한 공간
               _BookmarkSection(),
               SizedBox(height: 12),
-              _MapPreviewSection(),
-              SizedBox(height: 12),
+              // §1: 내가 쓴 리뷰 / 알림 / 문의·건의 / 설정·계정
               _ActivitySection(),
               SizedBox(height: 24),
             ],
@@ -240,15 +247,165 @@ class _AvatarWidget extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 방문 통계 섹션
+// §1: 나의 문화 지도 카드 (첫 번째 핵심 카드)
 // ─────────────────────────────────────────────────────────────────────────────
-class _StatsSection extends ConsumerWidget {
-  const _StatsSection();
+class _CultureMapCard extends ConsumerWidget {
+  const _CultureMapCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final visitedIds = ref.watch(visitedMuseumIdsProvider);
+    final bookmarkedIds = ref.watch(bookmarkedIdsProvider);
+    final stats = ref.watch(visitStatsProvider);
+    final thisMonthCount = stats?.thisMonthCount ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.map_outlined,
+                  size: 18,
+                  color: Color(0xFFE8A87C),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '나의 문화 지도',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 미니 통계 행
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Row(
+              children: [
+                _MiniStatChip(
+                  icon: Icons.place,
+                  label: '다녀온 공간',
+                  value: '${visitedIds.length}곳',
+                  color: const Color(0xFFD32F2F),
+                ),
+                const SizedBox(width: 8),
+                _MiniStatChip(
+                  icon: Icons.bookmark,
+                  label: '북마크',
+                  value: '${bookmarkedIds.length}곳',
+                  color: const Color(0xFF1565C0),
+                ),
+                const SizedBox(width: 8),
+                _MiniStatChip(
+                  icon: Icons.calendar_today,
+                  label: '이번 달',
+                  value: '$thisMonthCount회',
+                  color: Colors.green.shade600,
+                ),
+                const Spacer(),
+                // 지도 이동 버튼
+                ElevatedButton(
+                  onPressed: () => context.push('/mypage/map'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE8A87C),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.map, size: 14),
+                      SizedBox(width: 4),
+                      Text('지도 열기',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _MiniStatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: AppTheme.textSecondaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §1: 내 방문 기록 카드 (레벨 + 통계)
+// ─────────────────────────────────────────────────────────────────────────────
+class _VisitStatsCard extends ConsumerWidget {
+  const _VisitStatsCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final visitsAsync = ref.watch(myVisitsProvider);
     final stats = ref.watch(visitStatsProvider);
+    final level = ref.watch(cultureLevelProvider);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -291,17 +448,33 @@ class _StatsSection extends ConsumerWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-            error: (_, __) => _StatsError(),
+            error: (_, __) => Center(
+              child: Text(
+                '방문 기록을 불러오지 못했어요.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondaryColor,
+                ),
+              ),
+            ),
             data: (_) {
-              if (stats == null) {
-                return const SizedBox(
-                  height: 80,
-                  child: Center(
-                    child: Text('방문 통계를 불러오는 중입니다'),
+              if (stats == null || stats.totalCount == 0) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      '첫 방문을 기록해 보세요.\n박물관·미술관·과학관 방문을 남기면 문화 레벨이 올라가요.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondaryColor,
+                        height: 1.6,
+                      ),
+                    ),
                   ),
                 );
               }
-              return _StatsContent(stats: stats);
+              return _VisitStatsContent(stats: stats, level: level);
             },
           ),
         ],
@@ -310,46 +483,31 @@ class _StatsSection extends ConsumerWidget {
   }
 }
 
-class _StatsContent extends StatelessWidget {
-  final VisitStats? stats;
+class _VisitStatsContent extends StatelessWidget {
+  final VisitStats stats;
+  final CultureLevel level;
 
-  const _StatsContent({this.stats});
+  const _VisitStatsContent({required this.stats, required this.level});
 
   @override
   Widget build(BuildContext context) {
-    if (stats == null || stats!.totalCount == 0) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            '아직 방문 기록이 없어요.\n박물관을 방문하고 기록해 보세요!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondaryColor,
-              height: 1.6,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final s = stats!;
-    // 유형별 상위 3개
-    final topTypes = s.byType.entries.toList()
+    // 유형별 상위 1개 (가장 많이 간 유형)
+    final topTypes = stats.byType.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final topRegions = s.byRegion.entries.toList()
+    // 지역별 TOP 3
+    final topRegions = stats.byRegion.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 총 방문 수 + 고유 박물관 수 (P1-2 픽스)
+        // 총 방문 + 다녀온 공간
         Row(
           children: [
             Expanded(
               child: _StatCard(
                 label: '총 방문 횟수',
-                value: '${s.totalCount}',
+                value: '${stats.totalCount}',
                 unit: '회',
                 color: AppTheme.primaryColor,
               ),
@@ -357,15 +515,19 @@ class _StatsContent extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _StatCard(
-                label: '방문한 박물관',
-                value: '${s.distinctMuseumCount}',
+                label: '다녀온 공간',
+                value: '${stats.distinctMuseumCount}',
                 unit: '곳',
                 color: AppTheme.accentColor,
               ),
             ),
           ],
         ),
-        if (topTypes.isNotEmpty) ...[  
+        const SizedBox(height: 16),
+        // 나의 문화 레벨 + 프로그레스
+        _LevelBar(level: level),
+        // 가장 많이 간 유형 (있을 때만)
+        if (topTypes.isNotEmpty) ...[
           const SizedBox(height: 12),
           _StatCard(
             label: '가장 많이 간 유형',
@@ -374,6 +536,7 @@ class _StatsContent extends StatelessWidget {
             color: AppTheme.primaryColor.withValues(alpha: 0.7),
           ),
         ],
+        // 지역별 방문 TOP 3 (있을 때만)
         if (topRegions.isNotEmpty) ...[
           const SizedBox(height: 12),
           _RegionBar(topRegions: topRegions.take(3).toList()),
@@ -383,6 +546,80 @@ class _StatsContent extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 레벨 바 위젯
+// ─────────────────────────────────────────────────────────────────────────────
+class _LevelBar extends StatelessWidget {
+  final CultureLevel level;
+
+  const _LevelBar({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    final levelColor = _levelColor(level.level);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: levelColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: levelColor.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                level.level == 0 ? '문화 레벨' : level.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: levelColor,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                level.progressLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondaryColor,
+                ),
+              ),
+            ],
+          ),
+          if (level.level > 0) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: level.progressRatio,
+                backgroundColor: AppTheme.dividerColor,
+                valueColor: AlwaysStoppedAnimation<Color>(levelColor),
+                minHeight: 8,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _levelColor(int level) {
+    switch (level) {
+      case 1: return const Color(0xFF66BB6A); // 초록
+      case 2: return const Color(0xFF42A5F5); // 파랑
+      case 3: return const Color(0xFFAB47BC); // 보라
+      case 4: return const Color(0xFFFF7043); // 주황
+      case 5: return const Color(0xFFFFB300); // 앰버
+      case 6: return const Color(0xFFE53935); // 빨강
+      default: return AppTheme.textSecondaryColor;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 통계 카드 위젯
+// ─────────────────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -456,6 +693,9 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 지역 바 위젯
+// ─────────────────────────────────────────────────────────────────────────────
 class _RegionBar extends StatelessWidget {
   final List<MapEntry<String, int>> topRegions;
 
@@ -472,7 +712,7 @@ class _RegionBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '지역별 방문',
+          '지역별 방문 TOP 3',
           style: TextStyle(
             fontSize: 12,
             color: AppTheme.textSecondaryColor,
@@ -530,20 +770,8 @@ class _RegionBar extends StatelessWidget {
   }
 }
 
-class _StatsError extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '방문 기록을 불러오지 못했어요.',
-        style: TextStyle(fontSize: 13, color: AppTheme.textSecondaryColor),
-      ),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// 북마크 섹션
+// §1: 북마크한 공간 섹션 (명칭 변경: 박물관 → 공간)
 // ─────────────────────────────────────────────────────────────────────────────
 class _BookmarkSection extends ConsumerWidget {
   const _BookmarkSection();
@@ -567,7 +795,7 @@ class _BookmarkSection extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '북마크한 박물관',
+                '북마크한 공간',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -625,7 +853,7 @@ class _BookmarkSection extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      '북마크한 박물관이 없어요.\n마음에 드는 박물관을 저장해 보세요!',
+                      '가보고 싶은 공간을 북마크해 보세요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -796,172 +1024,7 @@ class _SmallBadge extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// v1.6: 내가 다녀온 박물관 지도 프리뷰 섹션
-// ─────────────────────────────────────────────────────────────────────────────
-class _MapPreviewSection extends ConsumerWidget {
-  const _MapPreviewSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final visitedIds = ref.watch(visitedMuseumIdsProvider);
-    final bookmarkedIds = ref.watch(bookmarkedIdsProvider);
-    final visits = ref.watch(myVisitsProvider).valueOrNull ?? [];
-
-    // 이번 달 방문 횟수
-    final now = DateTime.now();
-    final thisMonthCount = visits
-        .where((v) =>
-            v.visitedAt.year == now.year && v.visitedAt.month == now.month)
-        .length;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 헤더
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.map_outlined,
-                  size: 18,
-                  color: Color(0xFFE8A87C),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '내가 다녀온 박물관 지도',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimaryColor,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/mypage/map'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.primaryColor,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                  ),
-                  child: const Text('지도 보기',
-                      style: TextStyle(fontSize: 13)),
-                ),
-              ],
-            ),
-          ),
-          // 미니 통계 행
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Row(
-              children: [
-                _MiniStatChip(
-                  icon: Icons.place,
-                  label: '방문 박물관',
-                  value: '${visitedIds.length}곳',
-                  color: const Color(0xFFD4622A),
-                ),
-                const SizedBox(width: 8),
-                _MiniStatChip(
-                  icon: Icons.bookmark,
-                  label: '북마크',
-                  value: '${bookmarkedIds.length}곳',
-                  color: const Color(0xFF1565C0),
-                ),
-                const SizedBox(width: 8),
-                _MiniStatChip(
-                  icon: Icons.calendar_today,
-                  label: '이번 달',
-                  value: '$thisMonthCount회',
-                  color: Colors.green.shade600,
-                ),
-                const Spacer(),
-                // 지도 이동 버튼
-                ElevatedButton(
-                  onPressed: () => context.push('/mypage/map'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8A87C),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.map, size: 14),
-                      SizedBox(width: 4),
-                      Text('지도 열기',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniStatChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MiniStatChip({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: AppTheme.textSecondaryColor,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 내 활동 섹션
+// §1: 내 활동 섹션 (내가 쓴 리뷰 / 알림 / 문의·건의 / 설정·계정)
 // ─────────────────────────────────────────────────────────────────────────────
 class _ActivitySection extends ConsumerWidget {
   const _ActivitySection();
@@ -990,32 +1053,40 @@ class _ActivitySection extends ConsumerWidget {
             ),
           ),
           _MenuItem(
-            icon: Icons.history,
-            label: '방문 기록',
-            onTap: () => context.push('/visits'),
-          ),
-          Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
-          _MenuItem(
-            icon: Icons.bookmark_border,
-            label: '북마크한 박물관',
-            onTap: () => context.push('/mypage/bookmarks'),
-          ),
-          Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
-          _MenuItem(
             icon: Icons.rate_review_outlined,
             label: '내가 쓴 리뷰',
-            trailing: _ComingSoonBadge(),
-            onTap: () {},
+            onTap: () => context.push(AppRoutes.myReviews),
           ),
           Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
-          // M6: 문의/건의 진입점
+          _MenuItem(
+            icon: Icons.notifications_outlined,
+            label: '알림',
+            onTap: () => context.push(AppRoutes.notifications),
+          ),
+          Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
           _MenuItem(
             icon: Icons.feedback_outlined,
             label: '문의 / 건의',
             onTap: () => context.push(AppRoutes.feedback),
           ),
+          Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
+          _MenuItem(
+            icon: Icons.settings_outlined,
+            label: '설정 / 계정',
+            onTap: () => _showSettingsSheet(context, ref),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showSettingsSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _SettingsSheet(ref: ref),
     );
   }
 }
@@ -1024,13 +1095,11 @@ class _MenuItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final Widget? trailing;
 
   const _MenuItem({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.trailing,
   });
 
   @override
@@ -1039,30 +1108,8 @@ class _MenuItem extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
       leading: Icon(icon, color: AppTheme.primaryColor, size: 22),
       title: Text(label, style: const TextStyle(fontSize: 15)),
-      trailing: trailing ??
-          Icon(Icons.chevron_right, size: 20, color: AppTheme.textSecondaryColor),
+      trailing: Icon(Icons.chevron_right, size: 20, color: AppTheme.textSecondaryColor),
       onTap: onTap,
-    );
-  }
-}
-
-class _ComingSoonBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppTheme.accentColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        '준비 중',
-        style: TextStyle(
-          fontSize: 11,
-          color: AppTheme.accentColor,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }
@@ -1098,11 +1145,12 @@ class _SettingsSheet extends ConsumerWidget {
               trailing: _ComingSoonBadge(),
               onTap: () {},
             ),
+            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('앱 정보'),
               trailing: Text(
-                'v0.1.0',
+                'v0.2.0',
                 style: TextStyle(
                   fontSize: 13,
                   color: AppTheme.textSecondaryColor,
@@ -1145,6 +1193,27 @@ class _SettingsSheet extends ConsumerWidget {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ComingSoonBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '준비 중',
+        style: TextStyle(
+          fontSize: 11,
+          color: AppTheme.accentColor,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

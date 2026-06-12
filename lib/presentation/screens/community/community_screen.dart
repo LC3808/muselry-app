@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../config/router.dart';
+import '../../../core/utils/nickname_utils.dart'; // §8-1
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/comment.dart';
 import '../../../domain/models/review.dart';
@@ -279,7 +280,7 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _maskNickname(widget.review.authorNickname),
+                            maskNickname(widget.review.authorNickname),
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -310,6 +311,17 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
                   maxLines: 4,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (widget.review.visitedOn != null) ...[ // R27
+                  const SizedBox(height: 6),
+                  Text(
+                    '방문일 ${widget.review.visitedOn!.month}월 ${widget.review.visitedOn!.day}일',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.accentColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -364,18 +376,7 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
     }
   }
 
-  static String _maskNickname(String? nickname) {
-    if (nickname == null || nickname.isEmpty) return '익명';
-    if (nickname.contains('@')) {
-      final parts = nickname.split('@');
-      final local = parts[0];
-      final domain = parts.length > 1 ? '@${parts[1]}' : '';
-      if (local.length <= 2) return '$local****$domain';
-      return '${local.substring(0, 2)}****$domain';
-    }
-    if (nickname.length <= 2) return nickname;
-    return '${nickname.substring(0, 2)}${'*' * (nickname.length - 2).clamp(2, 6)}';
-  }
+  // §8-1: maskNickname removed — use maskNickname() from nickname_utils.dart
 
   String _formatDate(DateTime dt) {
     final now = DateTime.now();
@@ -681,7 +682,7 @@ class _CommentItem extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      _maskNickname(comment.authorNickname),
+                      maskNickname(comment.authorNickname),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -739,18 +740,7 @@ class _CommentItem extends StatelessWidget {
     );
   }
 
-  static String _maskNickname(String? nickname) {
-    if (nickname == null || nickname.isEmpty) return '익명';
-    if (nickname.contains('@')) {
-      final parts = nickname.split('@');
-      final local = parts[0];
-      final domain = parts.length > 1 ? '@${parts[1]}' : '';
-      if (local.length <= 2) return '$local****$domain';
-      return '${local.substring(0, 2)}****$domain';
-    }
-    if (nickname.length <= 2) return nickname;
-    return '${nickname.substring(0, 2)}${'*' * (nickname.length - 2).clamp(2, 6)}';
-  }
+  // §8-1: maskNickname removed — use maskNickname() from nickname_utils.dart
 
   String _formatDate(DateTime dt) {
     final now = DateTime.now();

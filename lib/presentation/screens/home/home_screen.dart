@@ -10,7 +10,7 @@ import '../../providers/profile_provider.dart';
 
 /// 홈 화면 (Day 9 업데이트)
 /// - 인기 장소 가로 스크롤 섹션 추가 (museum_ranking 기준, 폴백: average_rating)
-/// - 빠른 탐색 그리드 유지
+/// - §8-3: 빠른 탐색 섹션 삭제
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -26,7 +26,7 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => context.push(AppRoutes.mypage),
+            onPressed: () => context.go(AppRoutes.mypage), // M7-A: mypage is now shell tab
           ),
         ],
       ),
@@ -43,53 +43,12 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 // ── 인사말 배너 ──────────────────────────────────────────
                 _GreetingBanner(displayName: displayName),
-                const SizedBox(height: 24),
 
-                // ── 빠른 탐색 ────────────────────────────────────────────
-                Text(
-                  '빠른 탐색',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.6,
-                  children: [
-                    _QuickAccessCard(
-                      emoji: '🔍',
-                      label: '전시 공간 탐색',
-                      color: const Color(0xFF3498DB),
-                      onTap: () => context.go(AppRoutes.explore),
-                    ),
-                    _QuickAccessCard(
-                      emoji: '🗺️',
-                      label: '지도로 찾기',
-                      color: const Color(0xFF27AE60),
-                      onTap: () => context.go(AppRoutes.map),
-                    ),
-                    _QuickAccessCard(
-                      emoji: '📖',
-                      label: '내 방문 기록',
-                      color: const Color(0xFFE67E22),
-                      onTap: () => context.go(AppRoutes.records),
-                    ),
-                    _QuickAccessCard(
-                      emoji: '💬',
-                      label: '커뮤니티',
-                      color: const Color(0xFF9B59B6),
-                      onTap: () => context.go(AppRoutes.community),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24), // M7-G-7: 인사말↔그리드 간격 (f3dca0d 원본값)
+
+                // ── 빠른 탐색 버튼 그리드 (M7-G-1: 헤더 없이 4버튼만) ────────────
+                _QuickAccessGrid(),
+                const SizedBox(height: 32), // M7-G-7: 그리드↔인기 장소 간격 (f3dca0d 원본값)
 
                 // ── 인기 장소 섹션 ─────────────────────────────────────
                 Row(
@@ -181,7 +140,7 @@ class _GreetingBanner extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '오늘은 어떤 박물관을 탐험해볼까요?',
+            '오늘은 어떤 공간을 탐험해볼까요?', // §8-2 M7-F-2
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.7),
               fontSize: 13,
@@ -455,7 +414,51 @@ class _PopularMuseumsEmpty extends StatelessWidget {
   }
 }
 
-// ─── 빠른 탐색 카드 ──────────────────────────────────────────────────────────
+// ─── 빠른 탐색 그리드 (M7-G-5-1: 파스텔 카드 디자인 복원) ─────────────────────────
+
+class _QuickAccessGrid extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.6,
+      children: [
+        // M7-G-5-1: 하늘색 파스텔 카드 (전시 공간 탐색)
+        _QuickAccessCard(
+          emoji: '🔍',
+          label: '전시 공간 탐색',
+          color: const Color(0xFF3498DB),
+          onTap: () => context.go(AppRoutes.explore),
+        ),
+        // M7-G-5-1: 연두색 파스텔 카드 (지도로 찾기)
+        _QuickAccessCard(
+          emoji: '🗺️',
+          label: '지도로 찾기',
+          color: const Color(0xFF27AE60),
+          onTap: () => context.go(AppRoutes.map),
+        ),
+        // M7-G-5-1: 오렌지 파스텔 카드 (내 방문 기록, 라우팅 /mypage 유지)
+        _QuickAccessCard(
+          emoji: '📖',
+          label: '내 방문 기록',
+          color: const Color(0xFFE67E22),
+          onTap: () => context.go(AppRoutes.mypage), // M7-G-1: /records → /mypage
+        ),
+        // M7-G-5-1: 보라 파스텔 카드 (커뮤니티)
+        _QuickAccessCard(
+          emoji: '💬',
+          label: '커뮤니티',
+          color: const Color(0xFF9B59B6),
+          onTap: () => context.go(AppRoutes.community),
+        ),
+      ],
+    );
+  }
+}
 
 class _QuickAccessCard extends StatelessWidget {
   final String emoji;

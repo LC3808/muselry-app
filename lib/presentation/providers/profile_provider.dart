@@ -1,5 +1,5 @@
-import 'dart:io';
 
+import 'dart:io'; // File
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -96,13 +96,15 @@ final bookmarkedMuseumsProvider = FutureProvider<List<Museum>>((ref) async {
 /// 방문 기록 기반 통계 데이터 모델.
 class VisitStats {
   final int totalCount;              // 총 방문 횟수 (중복 포함)
-  final int distinctMuseumCount;     // 방문한 고유 박물관 수 (P1-2 픽스)
+  final int distinctMuseumCount;     // 방문한 고유 공간 수 (레벨 기준)
+  final int thisMonthCount;          // 이번 달 방문 횟수
   final Map<String, int> byType;    // 유형별 방문 수
   final Map<String, int> byRegion;  // 지역별 방문 수
 
   const VisitStats({
     required this.totalCount,
     required this.distinctMuseumCount,
+    required this.thisMonthCount,
     required this.byType,
     required this.byRegion,
   });
@@ -121,8 +123,14 @@ final visitStatsProvider = Provider<VisitStats?>((ref) {
 
   final byType = <String, int>{};
   final byRegion = <String, int>{};
+  final now = DateTime.now();
+  int thisMonthCount = 0;
 
   for (final visit in visits) {
+    // 이번 달 방문 횟수
+    if (visit.visitedAt.year == now.year && visit.visitedAt.month == now.month) {
+      thisMonthCount++;
+    }
     if (visit.museum != null) {
       final type = visit.museum!.type;
       byType[type] = (byType[type] ?? 0) + 1;
@@ -139,7 +147,121 @@ final visitStatsProvider = Provider<VisitStats?>((ref) {
   return VisitStats(
     totalCount: visits.length,
     distinctMuseumCount: distinctMuseumCount,
+    thisMonthCount: thisMonthCount,
     byType: byType,
     byRegion: byRegion,
   );
+});
+
+// ─── 나의 문화 레벨 계산 ──────────────────────────────────────────────────────
+/// §3 레벨 기준: 다녀온 공간 수(distinctMuseumCount) 기준 절대 등급 6단계.
+/// 레벨 기준 = 다녀온 공간 수 (총 방문 횟수 아님 — 같은 곳 반복 방문으로 레벨 오르지 않음).
+class CultureLevel {
+  final int level;          // 1~6
+  final String title;       // 문화 새싹 등
+  final int currentCount;   // 현재 다녀온 공간 수
+  final int? nextThreshold; // 다음 레벨 기준 (Lv.6이면 null)
+  final String progressLabel; // "다음 레벨까지 N곳" or "최고 레벨이에요"
+
+  const CultureLevel({
+    required this.level,
+    required this.title,
+    required this.currentCount,
+    this.nextThreshold,
+    required this.progressLabel,
+  });
+
+  /// 프로그레스바 비율 (0.0 ~ 1.0)
+  double get progressRatio {
+    if (nextThreshold == null) return 1.0;
+    // 현재 레벨 시작 기준
+    final start = _levelStart(level);
+    final span = nextThreshold! - start;
+    if (span <= 0) return 1.0;
+    return ((currentCount - start) / span).clamp(0.0, 1.0);
+  }
+
+  static int _levelStart(int level) {
+    switch (level) {
+      case 1: return 1;
+      case 2: return 6;
+      case 3: return 11;
+      case 4: return 21;
+      case 5: return 36;
+      case 6: return 57;
+      default: return 1;
+    }
+  }
+}
+
+/// distinctMuseumCount → CultureLevel 계산 함수.
+CultureLevel computeCultureLevel(int distinctCount) {
+  if (distinctCount == 0) {
+    return const CultureLevel(
+      level: 0,
+      title: '',
+      currentCount: 0,
+      nextThreshold: 1,
+      progressLabel: '첫 방문을 기록해 보세요',
+    );
+  }
+  if (distinctCount <= 5) {
+    return CultureLevel(
+      level: 1,
+      title: 'Lv.1 문화 새싹',
+      currentCount: distinctCount,
+      nextThreshold: 6,
+      progressLabel: '다음 레벨까지 ${6 - distinctCount}곳',
+    );
+  }
+  if (distinctCount <= 10) {
+    return CultureLevel(
+      level: 2,
+      title: 'Lv.2 문화 산책자',
+      currentCount: distinctCount,
+      nextThreshold: 11,
+      progressLabel: '다음 레벨까지 ${11 - distinctCount}곳',
+    );
+  }
+  if (distinctCount <= 20) {
+    return CultureLevel(
+      level: 3,
+      title: 'Lv.3 문화 탐험가',
+      currentCount: distinctCount,
+      nextThreshold: 21,
+      progressLabel: '다음 레벨까지 ${21 - distinctCount}곳',
+    );
+  }
+  if (distinctCount <= 35) {
+    return CultureLevel(
+      level: 4,
+      title: 'Lv.4 문화 애호가',
+      currentCount: distinctCount,
+      nextThreshold: 36,
+      progressLabel: '다음 레벨까지 ${36 - distinctCount}곳',
+    );
+  }
+  if (distinctCount <= 56) {
+    return CultureLevel(
+      level: 5,
+      title: 'Lv.5 문화 큐레이터',
+      currentCount: distinctCount,
+      nextThreshold: 57,
+      progressLabel: '다음 레벨까지 ${57 - distinctCount}곳',
+    );
+  }
+  return CultureLevel(
+    level: 6,
+    title: 'Lv.6 문화 마스터',
+    currentCount: distinctCount,
+    nextThreshold: null,
+    progressLabel: '최고 레벨이에요 🎉',
+  );
+}
+
+/// visitStatsProvider에서 파생된 CultureLevel Provider.
+final cultureLevelProvider = Provider<CultureLevel>((ref) {
+  final stats = ref.watch(visitStatsProvider);
+  final distinctCount = stats?.distinctMuseumCount ?? 0;
+  return computeCultureLevel(distinctCount);
 });

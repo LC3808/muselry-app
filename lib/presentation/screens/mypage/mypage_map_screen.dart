@@ -9,9 +9,18 @@ import '../../providers/museum_provider.dart';
 import '../../providers/visit_provider.dart';
 
 // ─── 색상 상수 ────────────────────────────────────────────────────────────────
-const _kVisitedTintColor = Color(0xFFD4622A); // 방문 마커 틴트
-const _kBookmarkTintColor = Color(0xFF1565C0); // 북마크 마커 틴트
+// M7-G-2 확정 (2026-06-13): 운영자 확정 색상 적용
+// 방문 = Orange 700 (#F57C00) — 뮤즐리 메인 주황
+// 북마크 = Light Blue 400 (#29B6F6) — 차가운 하늘
+// 칩·범례·통계·바텀시트 모두 아래 상수 자동 참조
+const _kVisitedTintColor = Color(0xFFF57C00); // Orange 700 — 방문 마커/칩/범례
+const _kBookmarkTintColor = Color(0xFF29B6F6); // Light Blue 400 — 북마크 마커/칩/범례
 const _kDefaultColor = Color(0xFFBDBDBD); // 미방문 마커 (회색)
+
+// 유형별 색상 (탐색 지도 type 색상과 1:1 일치 — _TypeBadge 전용)
+const _kMuseumTypeColor = Color(0xFF388E3C); // 박물관 — 초록
+const _kGalleryTypeColor = Color(0xFFFFB300); // 미술관 — 앰버
+const _kScienceTypeColor = Color(0xFFD32F2F); // 과학관 — 빨강
 
 // ─── 필터 열거형 ──────────────────────────────────────────────────────────────
 enum _MapFilter { all, visited, bookmarked }
@@ -36,6 +45,9 @@ class MypageMapScreen extends ConsumerStatefulWidget {
 
 class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
   NaverMapController? _mapController;
+
+  // M7-C: 커스텀 마커 아이콘 캐시 (key → NOverlayImage?)
+  final Map<String, NOverlayImage?> _markerIconCache = {};
 
   // lifecycle guard
   bool _isDisposed = false;
@@ -140,7 +152,7 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text(
-          '내가 다녀온 박물관 지도',
+          '나의 문화 지도',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         backgroundColor: AppTheme.surfaceColor,
@@ -282,7 +294,7 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                         size: 32, color: AppTheme.textSecondaryColor),
                     const SizedBox(height: 8),
                     const Text(
-                      '아직 방문하거나 북마크한 박물관이 없어요',
+                      '아직 기록된 공간이 없어요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -292,7 +304,7 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      '박물관을 방문하거나 북마크하면 여기에 표시됩니다',
+                      '방문한 공간을 기록하면 나만의 문화지도가 만들어져요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -362,24 +374,49 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
         final isBookmarked = bookmarkedIds.contains(museum.id);
         if (_typeFilter != null && museum.type != _typeFilter) continue;
         final visitCount = visitCountMap[museum.id] ?? 0;
-        final markerSize = isVisited
-            ? NSize(
-                (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-                (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-              )
-            : const NSize(20, 20);
-        final Color tintColor;
+        final Color markerColor;
         if (isVisited) {
-          tintColor = _kVisitedTintColor;
+          markerColor = _kVisitedTintColor;
         } else if (isBookmarked) {
-          tintColor = _kBookmarkTintColor;
+          markerColor = _kBookmarkTintColor;
         } else {
-          tintColor = _kDefaultColor;
+          markerColor = _kDefaultColor;
         }
+        // M7-C: NOverlayImage.fromWidget 캐시 방식 (탐색 지도 동일 패턴)
+        final cacheKey = isVisited ? 'visited' : (isBookmarked ? 'bookmark' : 'default');
+        if (!_markerIconCache.containsKey(cacheKey)) {
+          try {
+            final icon = await NOverlayImage.fromWidget(
+              widget: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: markerColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+              size: const Size(18, 18),
+              context: context,
+            );
+            _markerIconCache[cacheKey] = icon;
+          } catch (_) {
+            _markerIconCache[cacheKey] = null;
+          }
+        }
+        final cachedIcon = _markerIconCache[cacheKey];
+        // M7-G-3: 기본 크기 축소(탐색 지도 동일), 크기 변화 제거, N회 방문은 x배지로
+        const markerSize = NSize(18, 18);
         final marker = NMarker(
           id: museum.id,
           position: NLatLng(museum.latitude!, museum.longitude!),
-          iconTintColor: tintColor,
           size: markerSize,
           caption: isVisited && visitCount > 1
               ? NOverlayCaption(
@@ -390,6 +427,11 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                 )
               : null,
         );
+        if (cachedIcon != null) {
+          marker.setIcon(cachedIcon);
+        } else {
+          marker.setIconTintColor(markerColor);
+        }
         marker.setOnTapListener((overlay) {
           final tappedMuseum = museums.firstWhere((m) => m.id == museum.id);
           if (!mounted) return;
@@ -681,9 +723,11 @@ class _FilterBar extends StatelessWidget {
             onTap: () => onTypeChanged(null),
           ),
           const SizedBox(width: 6),
+          // M7-G-4: 유형 칩에 type 색상 미리보기 적용
           _FilterChip(
             label: '박물관',
             selected: typeFilter == '박물관',
+            color: const Color(0xFF388E3C), // 탐색 지도 박물관 색 (초록)
             onTap: () =>
                 onTypeChanged(typeFilter == '박물관' ? null : '박물관'),
           ),
@@ -691,8 +735,18 @@ class _FilterBar extends StatelessWidget {
           _FilterChip(
             label: '미술관',
             selected: typeFilter == '미술관',
+            color: const Color(0xFFFFB300), // 탐색 지도 미술관 색 (앨버)
             onTap: () =>
                 onTypeChanged(typeFilter == '미술관' ? null : '미술관'),
+          ),
+          const SizedBox(width: 6),
+          // M7-6 + M7-G-4: 과학관 칩 (유형 색 미리보기)
+          _FilterChip(
+            label: '과학관',
+            selected: typeFilter == '과학관',
+            color: const Color(0xFFD32F2F), // 탐색 지도 과학관 색 (빨강)
+            onTap: () =>
+                onTypeChanged(typeFilter == '과학관' ? null : '과학관'),
           ),
         ],
       ),
@@ -700,6 +754,10 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
+// M7-G-5-2: 비선택 상태에서 그룹 색 테두리 적용 (color 있는 칩만)
+// - 선택: 해당 색 fill + 흰 글자 (기존 동일)
+// - 비선택: 흰 배경 + 그룹 색 테두리(50% 투명도) + 검정 글자
+// - color 없는 칩(전체/기간): 회색 테두리 유지
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -716,6 +774,10 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeColor = color ?? AppTheme.primaryColor;
+    // 비선택 테두리: color 있으면 그룹 색 50% 투명도, 없으면 회색
+    final unselectedBorderColor = color != null
+        ? color!.withValues(alpha: 0.50)
+        : AppTheme.dividerColor;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -725,7 +787,7 @@ class _FilterChip extends StatelessWidget {
           color: selected ? activeColor : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? activeColor : AppTheme.dividerColor,
+            color: selected ? activeColor : unselectedBorderColor,
           ),
           boxShadow: [
             BoxShadow(
@@ -774,7 +836,7 @@ class _StatsOverlay extends StatelessWidget {
         children: [
           _StatItem(
             icon: Icons.place,
-            label: '방문 박물관',
+            label: '방문 공간',
             value: '${stats.totalVisitedMuseums}곳',
             color: _kVisitedTintColor,
           ),
@@ -1016,7 +1078,12 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = type == '미술관' ? Colors.purple.shade400 : _kVisitedTintColor;
+    // M7-G-2: 유형별 고유 색상 (탐색 지도 type 색상과 1:1 일치)
+    final color = type == '박물관'
+        ? _kMuseumTypeColor
+        : type == '미술관'
+            ? _kGalleryTypeColor
+            : _kScienceTypeColor; // 과학관 (기본)
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(

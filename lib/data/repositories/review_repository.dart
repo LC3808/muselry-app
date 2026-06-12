@@ -155,6 +155,7 @@ class ReviewRepository {
     required String visitId,
     required double rating,
     required String content,
+    DateTime? visitedOn, // R27
   }) async {
     final uid = _requireUserId;
 
@@ -168,6 +169,9 @@ class ReviewRepository {
       'rating': rating,
       'content': content,
       'status': status.toJson(),
+      if (visitedOn != null)
+        'visited_on':
+            '${visitedOn.year}-${visitedOn.month.toString().padLeft(2, '0')}-${visitedOn.day.toString().padLeft(2, '0')}',
     };
 
     final response = await _client
@@ -187,6 +191,7 @@ class ReviewRepository {
     required String reviewId,
     required double rating,
     required String content,
+    DateTime? visitedOn, // R27
   }) async {
     _requireUserId;
 
@@ -198,6 +203,9 @@ class ReviewRepository {
       'content': content,
       'status': status.toJson(),
       'updated_at': DateTime.now().toIso8601String(),
+      if (visitedOn != null)
+        'visited_on':
+            '${visitedOn.year}-${visitedOn.month.toString().padLeft(2, '0')}-${visitedOn.day.toString().padLeft(2, '0')}',
     };
 
     final response = await _client
@@ -254,7 +262,7 @@ class ReviewRepository {
     final data = await _client
       .from('reviews')
       .select(
-        'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, '
+        'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, visited_on, '
         'profiles!user_id(nickname, avatar_url), '
         'museums!museum_id(id, name, region_1, image_url)',
       )

@@ -8,7 +8,7 @@ import '../presentation/screens/onboarding/onboarding_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/explore/explore_screen.dart';
 import '../presentation/screens/map/map_screen.dart';
-import '../presentation/screens/records/records_screen.dart';
+// M7-A: records_screen removed from shell — import deleted
 import '../presentation/screens/community/community_screen.dart';
 import '../presentation/screens/detail/museum_detail_screen.dart';
 import '../presentation/screens/mypage/bookmarks_screen.dart';
@@ -122,8 +122,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.records,
-                builder: (context, state) => const RecordsScreen(),
+                path: AppRoutes.mypage,
+                builder: (context, state) => const MypageScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'map',
+                    builder: (context, state) => const MypageMapScreen(),
+                  ),
+                  GoRoute(
+                    path: 'bookmarks',
+                    builder: (context, state) => const BookmarksScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -145,10 +155,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: AppRoutes.mypage,
-        builder: (context, state) => const MypageScreen(),
-      ),
-      GoRoute(
         path: AppRoutes.visitHistory,
         builder: (context, state) => const VisitHistoryScreen(),
       ),
@@ -163,14 +169,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.myReviews,
         builder: (context, state) => const MyReviewsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.mypageMap,
-        builder: (context, state) => const MypageMapScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.bookmarks,
-        builder: (context, state) => const BookmarksScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,

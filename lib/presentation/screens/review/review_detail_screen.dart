@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/nickname_utils.dart'; // §8-1
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/comment.dart';
 import '../../../domain/models/review.dart';
@@ -261,7 +262,7 @@ class _ReviewDetailBodyState extends ConsumerState<_ReviewDetailBody> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.review.authorNickname ?? '익명',
+                            maskNickname(widget.review.authorNickname), // §8-1
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -289,6 +290,17 @@ class _ReviewDetailBodyState extends ConsumerState<_ReviewDetailBody> {
                   widget.review.content,
                   style: const TextStyle(fontSize: 15, height: 1.6),
                 ),
+                if (widget.review.visitedOn != null) ...[ // R27
+                  const SizedBox(height: 8),
+                  Text(
+                    '방문일 ${widget.review.visitedOn!.month}월 ${widget.review.visitedOn!.day}일',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.accentColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
 
                 // ── 박물관 이동 버튼 ────────────────────────────────────────
@@ -608,7 +620,7 @@ class _CommentItem extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  comment.authorNickname ?? '익명',
+                  maskNickname(comment.authorNickname), // §8-1
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

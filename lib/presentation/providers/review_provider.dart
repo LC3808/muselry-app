@@ -68,6 +68,7 @@ class MyReviewsNotifier extends AsyncNotifier<List<Review>> {
     required String visitId,
     required double rating,
     required String content,
+    DateTime? visitedOn, // R27
   }) async {
     final repo = ref.read(reviewRepositoryProvider);
     final newReview = await repo.createReview(
@@ -75,6 +76,7 @@ class MyReviewsNotifier extends AsyncNotifier<List<Review>> {
       visitId: visitId,
       rating: rating,
       content: content,
+      visitedOn: visitedOn,
     );
     final current = state.valueOrNull ?? [];
     state = AsyncData([newReview, ...current]);
@@ -86,12 +88,14 @@ class MyReviewsNotifier extends AsyncNotifier<List<Review>> {
     required String reviewId,
     required double rating,
     required String content,
+    DateTime? visitedOn, // R27
   }) async {
     final repo = ref.read(reviewRepositoryProvider);
     final updated = await repo.updateReview(
       reviewId: reviewId,
       rating: rating,
       content: content,
+      visitedOn: visitedOn,
     );
     final current = state.valueOrNull ?? [];
     state = AsyncData(

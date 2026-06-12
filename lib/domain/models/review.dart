@@ -60,6 +60,9 @@ class Review {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// R27: 방문일 (nullable — 기존 리뷰는 null, 신규 리뷰는 date picker로 입력)
+  final DateTime? visitedOn;
+
   /// 조인 쿼리 시 채워지는 옵셔널 Museum 객체
   final Museum? museum;
 
@@ -82,6 +85,7 @@ class Review {
     this.museum,
     this.authorNickname,
     this.authorAvatarUrl,
+    this.visitedOn,
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
@@ -103,6 +107,9 @@ class Review {
           : null,
       authorNickname: profiles?['nickname'] as String?,
       authorAvatarUrl: profiles?['avatar_url'] as String?,
+      visitedOn: json['visited_on'] != null
+          ? DateTime.tryParse(json['visited_on'] as String)
+          : null,
     );
   }
 
@@ -115,6 +122,9 @@ class Review {
       'rating': rating,
       'content': content,
       'status': status.toJson(),
+      if (visitedOn != null)
+        'visited_on':
+            '${visitedOn!.year}-${visitedOn!.month.toString().padLeft(2, '0')}-${visitedOn!.day.toString().padLeft(2, '0')}',
     };
   }
 
@@ -123,6 +133,9 @@ class Review {
       'rating': rating,
       'content': content,
       'updated_at': DateTime.now().toIso8601String(),
+      if (visitedOn != null)
+        'visited_on':
+            '${visitedOn!.year}-${visitedOn!.month.toString().padLeft(2, '0')}-${visitedOn!.day.toString().padLeft(2, '0')}',
     };
   }
 
@@ -139,6 +152,7 @@ class Review {
     Museum? museum,
     String? authorNickname,
     String? authorAvatarUrl,
+    DateTime? visitedOn,
   }) {
     return Review(
       id: id ?? this.id,
@@ -153,6 +167,7 @@ class Review {
       museum: museum ?? this.museum,
       authorNickname: authorNickname ?? this.authorNickname,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      visitedOn: visitedOn ?? this.visitedOn,
     );
   }
 
