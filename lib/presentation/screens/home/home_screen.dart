@@ -412,82 +412,88 @@ class _PopularMuseumsEmpty extends StatelessWidget {
   }
 }
 
-// ─── 빠른 탐색 그리드 (M7-G-1: 복원, 헤더 텍스트 제거) ─────────────────────────
+// ─── 빠른 탐색 그리드 (M7-G-5-1: 파스텔 카드 디자인 복원) ─────────────────────────
 
 class _QuickAccessGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = [
-      _QuickItem(
-        icon: Icons.explore_outlined,
-        label: '전시 공간 탐색',
-        onTap: () => context.go(AppRoutes.explore),
-      ),
-      _QuickItem(
-        icon: Icons.map_outlined,
-        label: '지도로 찾기',
-        onTap: () => context.go(AppRoutes.map),
-      ),
-      _QuickItem(
-        icon: Icons.person_outline,
-        label: '내 방문 기록',
-        onTap: () => context.go(AppRoutes.mypage), // M7-G-1: /records → /mypage
-      ),
-      _QuickItem(
-        icon: Icons.forum_outlined,
-        label: '커뮤니티',
-        onTap: () => context.go(AppRoutes.community),
-      ),
-    ];
-
     return GridView.count(
-      crossAxisCount: 4,
+      crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      childAspectRatio: 0.85,
-      children: items.map((item) => _QuickAccessCard(item: item)).toList(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.6,
+      children: [
+        // M7-G-5-1: 하늘색 파스텔 카드 (전시 공간 탐색)
+        _QuickAccessCard(
+          emoji: '🔍',
+          label: '전시 공간 탐색',
+          color: const Color(0xFF3498DB),
+          onTap: () => context.go(AppRoutes.explore),
+        ),
+        // M7-G-5-1: 연두색 파스텔 카드 (지도로 찾기)
+        _QuickAccessCard(
+          emoji: '🗺️',
+          label: '지도로 찾기',
+          color: const Color(0xFF27AE60),
+          onTap: () => context.go(AppRoutes.map),
+        ),
+        // M7-G-5-1: 오렌지 파스텔 카드 (내 방문 기록, 라우팅 /mypage 유지)
+        _QuickAccessCard(
+          emoji: '📖',
+          label: '내 방문 기록',
+          color: const Color(0xFFE67E22),
+          onTap: () => context.go(AppRoutes.mypage), // M7-G-1: /records → /mypage
+        ),
+        // M7-G-5-1: 보라 파스텔 카드 (커뮤니티)
+        _QuickAccessCard(
+          emoji: '💬',
+          label: '커뮤니티',
+          color: const Color(0xFF9B59B6),
+          onTap: () => context.go(AppRoutes.community),
+        ),
+      ],
     );
   }
 }
 
-class _QuickItem {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _QuickItem({required this.icon, required this.label, required this.onTap});
-}
-
 class _QuickAccessCard extends StatelessWidget {
-  final _QuickItem item;
-  const _QuickAccessCard({required this.item});
+  final String emoji;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickAccessCard({
+    required this.emoji,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: item.onTap,
-      borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withValues(alpha: 0.08),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(item.icon, size: 28, color: AppTheme.primaryColor),
-            const SizedBox(height: 6),
+            Text(emoji, style: const TextStyle(fontSize: 24)),
             Text(
-              item.label,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textPrimaryColor,
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color.withValues(alpha: 0.9),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
