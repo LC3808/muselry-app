@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/router.dart';
+import '../../../core/utils/nickname_utils.dart'; // §8-1
 import '../../../core/errors/auth_required_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -137,7 +138,7 @@ class ReviewScreen extends ConsumerWidget {
         museumId: museumId,
         visitId: visit.id,
         visitedAt: visit.visitedAt,
-        onSubmit: (rating, content) async {
+        onSubmit: (rating, content, visitedOn) async { // R27
           try {
             final newReview = await ref
                 .read(myReviewsProvider.notifier)
@@ -146,6 +147,7 @@ class ReviewScreen extends ConsumerWidget {
                   visitId: visit.id,
                   rating: rating,
                   content: content,
+                  visitedOn: visitedOn,
                 );
             if (context.mounted) {
               Navigator.pop(context);
@@ -205,7 +207,7 @@ class ReviewScreen extends ConsumerWidget {
         isEdit: true,
         initialRating: review.rating,
         initialContent: review.content,
-        onSubmit: (rating, content) async {
+        onSubmit: (rating, content, visitedOn) async { // R27
           try {
             final updated = await ref
                 .read(myReviewsProvider.notifier)
@@ -213,6 +215,7 @@ class ReviewScreen extends ConsumerWidget {
                   reviewId: review.id,
                   rating: rating,
                   content: content,
+                  visitedOn: visitedOn,
                 );
             if (context.mounted) {
               Navigator.pop(context);
@@ -745,7 +748,7 @@ class _ReviewCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          review.authorNickname ?? '익명',
+                          maskNickname(review.authorNickname), // §8-1
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -836,7 +839,7 @@ class _ReviewCard extends StatelessWidget {
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
-              // R22: 날짜 + 댓글 수 뱃지 Row
+              // R22: 날짜 + 댓글 수 뱃지 Row / R27: 방문일 추가
               Row(
                 children: [
                   Text(
@@ -845,6 +848,16 @@ class _ReviewCard extends StatelessWidget {
                       color: AppTheme.textSecondaryColor,
                     ),
                   ),
+                  if (review.visitedOn != null) ...[  // R27
+                    const SizedBox(width: 8),
+                    Text(
+                      '방문일 ${review.visitedOn!.month}월 ${review.visitedOn!.day}일',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.accentColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                   if ((commentCount ?? 0) > 0) ...[
                     const SizedBox(width: 8),
                     Text(
@@ -941,7 +954,7 @@ class _ReviewFormSheet extends StatefulWidget {
   final double? initialRating;
   final String? initialContent;
   final bool isEdit;
-  final Future<void> Function(double rating, String content) onSubmit;
+  final Future<void> Function(double rating, String content, DateTime? visitedOn) onSubmit; // R27
 
   const _ReviewFormSheet({
     required this.museumId,
@@ -962,6 +975,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
   late TextEditingController _contentController;
   bool _isSubmitting = false;
   String? _filterError;
+  DateTime? _visitedOn; // R27: 방문일 (기본값 = visitedAt 또는 오늘)
   static const int _minLength = 10;  // DB reviews_content_check 제약과 일치
   static const int _maxLength = 500; // DB reviews_content_check 제약과 일치
 
@@ -971,6 +985,8 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
     _rating = widget.initialRating ?? 3.0;
     _contentController =
         TextEditingController(text: widget.initialContent ?? '');
+    // R27: 방문일 기본값 = 방문 기록의 visitedAt, 없으면 오늘
+    _visitedOn = widget.visitedAt ?? DateTime.now();
   }
 
   @override
@@ -1003,7 +1019,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
     _filterError = null;
   });
   try {
-    await widget.onSubmit(_rating, content);
+    await widget.onSubmit(_rating, content, _visitedOn); // R27
   } finally {
     if (mounted) setState(() => _isSubmitting = false);
   }
@@ -1051,26 +1067,50 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                       color: AppTheme.textPrimaryColor,
                     ),
                   ),
-                  if (widget.visitedAt != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${widget.visitedAt!.year}.${widget.visitedAt!.month.toString().padLeft(2, '0')}.${widget.visitedAt!.day.toString().padLeft(2, '0')} 방문',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.accentColor,
-                          fontWeight: FontWeight.w500,
+                ],
+              ),
+              const SizedBox(height: 12),
+              // R27: 방문일 선택 (date picker)
+              GestureDetector(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _visitedOn ?? now,
+                    firstDate: DateTime(2000),
+                    lastDate: now, // 미래 날짜 금지
+                    helpText: '방문일 선택',
+                    cancelText: '취소',
+                    confirmText: '확인',
+                  );
+                  if (picked != null) setState(() => _visitedOn = picked);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.dividerColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined, size: 16,
+                          color: AppTheme.textSecondaryColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        _visitedOn != null
+                            ? '방문일: ${_visitedOn!.month}월 ${_visitedOn!.day}일'
+                            : '방문일 선택 (선택사항)',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondaryColor,
                         ),
                       ),
-                    ),
-                  ],
-                ],
+                      const Spacer(),
+                      const Icon(Icons.chevron_right, size: 16,
+                          color: AppTheme.textSecondaryColor),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               // 별점 선택

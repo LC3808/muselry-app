@@ -10,7 +10,7 @@ import '../../providers/profile_provider.dart';
 
 /// 홈 화면 (Day 9 업데이트)
 /// - 인기 장소 가로 스크롤 섹션 추가 (museum_ranking 기준, 폴백: average_rating)
-/// - 빠른 탐색 그리드 유지
+/// - §8-3: 빠른 탐색 섹션 삭제
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -26,7 +26,7 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => context.push(AppRoutes.mypage),
+            onPressed: () => context.go(AppRoutes.mypage), // M7-A: mypage is now shell tab
           ),
         ],
       ),
@@ -43,53 +43,6 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 // ── 인사말 배너 ──────────────────────────────────────────
                 _GreetingBanner(displayName: displayName),
-                const SizedBox(height: 24),
-
-                // ── 빠른 탐색 ────────────────────────────────────────────
-                Text(
-                  '빠른 탐색',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.6,
-                  children: [
-                    _QuickAccessCard(
-                      emoji: '🔍',
-                      label: '전시 공간 탐색',
-                      color: const Color(0xFF3498DB),
-                      onTap: () => context.go(AppRoutes.explore),
-                    ),
-                    _QuickAccessCard(
-                      emoji: '🗺️',
-                      label: '지도로 찾기',
-                      color: const Color(0xFF27AE60),
-                      onTap: () => context.go(AppRoutes.map),
-                    ),
-                    _QuickAccessCard(
-                      emoji: '📖',
-                      label: '내 방문 기록',
-                      color: const Color(0xFFE67E22),
-                      onTap: () => context.go(AppRoutes.records),
-                    ),
-                    _QuickAccessCard(
-                      emoji: '💬',
-                      label: '커뮤니티',
-                      color: const Color(0xFF9B59B6),
-                      onTap: () => context.go(AppRoutes.community),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
 
                 // ── 인기 장소 섹션 ─────────────────────────────────────
                 Row(
@@ -181,7 +134,7 @@ class _GreetingBanner extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '오늘은 어떤 박물관을 탐험해볼까요?',
+            '오늘은 어떤 전시 공간을 탐험해볼까요?', // §8-2
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.7),
               fontSize: 13,
@@ -455,48 +408,4 @@ class _PopularMuseumsEmpty extends StatelessWidget {
   }
 }
 
-// ─── 빠른 탐색 카드 ──────────────────────────────────────────────────────────
-
-class _QuickAccessCard extends StatelessWidget {
-  final String emoji;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickAccessCard({
-    required this.emoji,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 24)),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: color.withValues(alpha: 0.9),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// §8-3: _QuickAccessCard removed (빠른 탐색 섹션 삭제)

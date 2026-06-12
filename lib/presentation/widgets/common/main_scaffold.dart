@@ -82,9 +82,9 @@ class _MainScaffoldState extends State<MainScaffold> {
               label: '지도',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bookmark_border_outlined),
-              activeIcon: Icon(Icons.bookmark),
-              label: '기록',
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: '마이페이지',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.people_outline),
