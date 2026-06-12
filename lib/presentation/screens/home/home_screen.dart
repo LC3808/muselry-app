@@ -44,6 +44,10 @@ class HomeScreen extends ConsumerWidget {
                 // ── 인사말 배너 ──────────────────────────────────────────
                 _GreetingBanner(displayName: displayName),
 
+                // ── 빠른 탐색 버튼 그리드 (M7-G-1: 헤더 없이 4버튼만) ────────────
+                _QuickAccessGrid(),
+                const SizedBox(height: 20),
+
                 // ── 인기 장소 섹션 ─────────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -408,4 +412,86 @@ class _PopularMuseumsEmpty extends StatelessWidget {
   }
 }
 
-// §8-3: _QuickAccessCard removed (빠른 탐색 섹션 삭제)
+// ─── 빠른 탐색 그리드 (M7-G-1: 복원, 헤더 텍스트 제거) ─────────────────────────
+
+class _QuickAccessGrid extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = [
+      _QuickItem(
+        icon: Icons.explore_outlined,
+        label: '전시 공간 탐색',
+        onTap: () => context.go(AppRoutes.explore),
+      ),
+      _QuickItem(
+        icon: Icons.map_outlined,
+        label: '지도로 찾기',
+        onTap: () => context.go(AppRoutes.map),
+      ),
+      _QuickItem(
+        icon: Icons.person_outline,
+        label: '내 방문 기록',
+        onTap: () => context.go(AppRoutes.mypage), // M7-G-1: /records → /mypage
+      ),
+      _QuickItem(
+        icon: Icons.forum_outlined,
+        label: '커뮤니티',
+        onTap: () => context.go(AppRoutes.community),
+      ),
+    ];
+
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      childAspectRatio: 0.85,
+      children: items.map((item) => _QuickAccessCard(item: item)).toList(),
+    );
+  }
+}
+
+class _QuickItem {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _QuickItem({required this.icon, required this.label, required this.onTap});
+}
+
+class _QuickAccessCard extends StatelessWidget {
+  final _QuickItem item;
+  const _QuickAccessCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: item.onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(item.icon, size: 28, color: AppTheme.primaryColor),
+            const SizedBox(height: 6),
+            Text(
+              item.label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textPrimaryColor,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

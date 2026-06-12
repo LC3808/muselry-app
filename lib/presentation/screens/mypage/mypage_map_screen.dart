@@ -10,8 +10,11 @@ import '../../providers/visit_provider.dart';
 
 // ─── 색상 상수 ────────────────────────────────────────────────────────────────
 // M7-C: 방문=빨강(#D32F2F), 북마크=파랑(#1565C0) — 범례와 1:1 일치
-const _kVisitedTintColor = Color(0xFFD32F2F); // 방문 마커 (빨강)
-const _kBookmarkTintColor = Color(0xFF1565C0); // 북마크 마커 (파랑)
+// M7-G-2 TODO: 운영자 확정 색상 코드 수령 후 아래 두 상수 수정
+// 현재: 방문=#D32F2F(빨강), 북마크=#1565C0(파랑)
+// 후보: 방문=#F58220(주황/액센트), 북마크=#7CB342(연두) 또는 #4FC3F7(하늘)
+const _kVisitedTintColor = Color(0xFFD32F2F); // TODO M7-G-2: 운영자 확정 후 주황 계열로 교체
+const _kBookmarkTintColor = Color(0xFF1565C0); // TODO M7-G-2: 운영자 확정 후 연두/하늘로 교체
 const _kDefaultColor = Color(0xFFBDBDBD); // 미방문 마커 (회색)
 
 // ─── 필터 열거형 ──────────────────────────────────────────────────────────────
@@ -404,12 +407,8 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
           }
         }
         final cachedIcon = _markerIconCache[cacheKey];
-        final markerSize = isVisited
-            ? NSize(
-                (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-                (24 + (visitCount.clamp(1, 3) - 1) * 6).toDouble(),
-              )
-            : const NSize(20, 20);
+        // M7-G-3: 기본 크기 축소(탐색 지도 동일), 크기 변화 제거, N회 방문은 x배지로
+        const markerSize = NSize(18, 18);
         final marker = NMarker(
           id: museum.id,
           position: NLatLng(museum.latitude!, museum.longitude!),
@@ -719,9 +718,11 @@ class _FilterBar extends StatelessWidget {
             onTap: () => onTypeChanged(null),
           ),
           const SizedBox(width: 6),
+          // M7-G-4: 유형 칩에 type 색상 미리보기 적용
           _FilterChip(
             label: '박물관',
             selected: typeFilter == '박물관',
+            color: const Color(0xFF388E3C), // 탐색 지도 박물관 색 (초록)
             onTap: () =>
                 onTypeChanged(typeFilter == '박물관' ? null : '박물관'),
           ),
@@ -729,14 +730,16 @@ class _FilterBar extends StatelessWidget {
           _FilterChip(
             label: '미술관',
             selected: typeFilter == '미술관',
+            color: const Color(0xFFFFB300), // 탐색 지도 미술관 색 (앨버)
             onTap: () =>
                 onTypeChanged(typeFilter == '미술관' ? null : '미술관'),
           ),
           const SizedBox(width: 6),
-          // M7-6: 과학관 칩 추가
+          // M7-6 + M7-G-4: 과학관 칩 (유형 색 미리보기)
           _FilterChip(
             label: '과학관',
             selected: typeFilter == '과학관',
+            color: const Color(0xFFD32F2F), // 탐색 지도 과학관 색 (빨강)
             onTap: () =>
                 onTypeChanged(typeFilter == '과학관' ? null : '과학관'),
           ),
