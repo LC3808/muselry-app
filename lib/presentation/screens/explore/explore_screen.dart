@@ -672,10 +672,11 @@ class _SortChipBar extends StatelessWidget {
 
   const _SortChipBar({required this.current, required this.onChanged});
 
+  // R23: 인기순 숨김 — static 인기 데이터 미적재, 출시 후 관람객 통계 적재 시 부활
+  // 원본: (label: '인기순', order: SortOrder.popularity)
   static const _items = [
     (label: '관련도', order: SortOrder.relevance),
     (label: '거리순', order: SortOrder.distance),
-    (label: '인기순', order: SortOrder.popularity),
     (label: '별점순', order: SortOrder.rating),
   ];
 

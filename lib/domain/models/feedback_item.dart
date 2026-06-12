@@ -36,12 +36,16 @@ enum FeedbackCategory {
 }
 
 /// 문의/건의 모델
+/// R20: admin_reply / replied_at / status 필드 추가
 class FeedbackItem {
   final String id;
   final String userId;
   final FeedbackCategory category;
   final String content;
   final DateTime createdAt;
+  final String? adminReply;   // R20: 관리자 답변 (null = 미답변)
+  final DateTime? repliedAt;  // R20: 답변 등록 시각
+  final String status;        // R20: 'pending' | 'answered' | 'closed'
 
   const FeedbackItem({
     required this.id,
@@ -49,6 +53,9 @@ class FeedbackItem {
     required this.category,
     required this.content,
     required this.createdAt,
+    this.adminReply,
+    this.repliedAt,
+    this.status = 'pending',
   });
 
   factory FeedbackItem.fromJson(Map<String, dynamic> json) {
@@ -58,6 +65,11 @@ class FeedbackItem {
       category: FeedbackCategory.fromString(json['category'] as String?),
       content: json['content'] as String? ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
+      adminReply: json['admin_reply'] as String?,
+      repliedAt: json['replied_at'] != null
+          ? DateTime.parse(json['replied_at'] as String)
+          : null,
+      status: json['status'] as String? ?? 'pending',
     );
   }
 }

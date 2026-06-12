@@ -178,7 +178,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.feedback,
-        builder: (context, state) => const FeedbackScreen(),
+        // R20: tab 쿼리파라미터 지원 — '1'이면 '내 문의 내역' 탭으로 직접 이동
+        builder: (context, state) {
+          final tabParam = state.uri.queryParameters['tab'];
+          final initialTab = tabParam == '1' ? 1 : 0;
+          return FeedbackScreen(initialTab: initialTab);
+        },
       ),
       GoRoute(
         path: AppRoutes.reviewDetail,

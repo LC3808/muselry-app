@@ -99,6 +99,11 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           .read(notificationNotifierProvider.notifier)
           .markAsRead(notification.id);
     }
+    // R20: feedback_reply 타입 → '내 문의 내역' 탭으로 이동
+    if (notification.type == 'feedback_reply') {
+      context.push('/feedback?tab=1');
+      return;
+    }
     // R5/R13: 리뷰 ID 있으면 단일 리뷰 화면으로 직접 이동
     // R13: commentId가 있으면 쿼리파라미터로 전달 → 하이라이트
     if (notification.reviewId != null) {
@@ -134,26 +139,33 @@ class _NotificationItem extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 아이콘
+            // 아이콘 (R20: 타입별 아이콘 분기)
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.accentColor.withValues(alpha: 0.15),
+                color: notification.type == 'feedback_reply'
+                    ? const Color(0xFFE8F5E9)
+                    : AppTheme.accentColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Center(
-                child: Text('💬', style: TextStyle(fontSize: 18)),
+              child: Center(
+                child: Text(
+                  notification.type == 'feedback_reply' ? '📨' : '💬',
+                  style: const TextStyle(fontSize: 18),
+                ),
               ),
             ),
             const SizedBox(width: 12),
-            // 내용
+            // 내용 (R20: 타입별 문구 분기)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '내 리뷰에 댓글이 달렸어요',
+                    notification.type == 'feedback_reply'
+                        ? '문의에 답변이 등록되었습니다'
+                        : '내 리뷰에 댓글이 달렸어요',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isUnread

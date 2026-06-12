@@ -15,8 +15,10 @@ final _myFeedbackProvider = FutureProvider.autoDispose<List<FeedbackItem>>(
 );
 
 /// 문의/건의 화면 (R6: 탭 2개 — 문의하기 + 내 문의 내역)
+/// R20: initialTab 파라미터 추가 — 알림 딥링크에서 내역 탭으로 직접 이동
 class FeedbackScreen extends ConsumerStatefulWidget {
-  const FeedbackScreen({super.key});
+  final int initialTab; // R20: 0=문의하기, 1=내 문의 내역
+  const FeedbackScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<FeedbackScreen> createState() => _FeedbackScreenState();
@@ -29,7 +31,11 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab, // R20: 알림 딥링크 지원
+    );
   }
 
   @override
@@ -324,6 +330,8 @@ class _FeedbackHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasReply = item.adminReply != null && item.adminReply!.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -334,6 +342,7 @@ class _FeedbackHistoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── 헤더 행: 카테고리 뱃지 + 상태 뱃지 + 날짜 ──────────────────
           Row(
             children: [
               Container(
@@ -352,6 +361,9 @@ class _FeedbackHistoryCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
+              // R20: 상태 뱃지
+              _StatusBadge(status: item.status, hasReply: hasReply),
               const Spacer(),
               Text(
                 _formatDate(item.createdAt),
@@ -363,11 +375,148 @@ class _FeedbackHistoryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+          // ── 문의 내용 ────────────────────────────────────────────────────
           Text(
             item.content,
             style: const TextStyle(fontSize: 13),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
+          ),
+          // ── R20: 답변 블록 ───────────────────────────────────────────────
+          if (hasReply) ...[
+            const SizedBox(height: 12),
+            _ReplyBlock(
+              reply: item.adminReply!,
+              repliedAt: item.repliedAt,
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            const _PendingBadge(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
+  }
+}
+
+/// R20: 상태 뱃지 (answered / pending / closed)
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  final bool hasReply;
+  const _StatusBadge({required this.status, required this.hasReply});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor;
+    final Color textColor;
+    final String label;
+
+    if (hasReply || status == 'answered') {
+      bgColor = const Color(0xFFE8F5E9);
+      textColor = const Color(0xFF2E7D32);
+      label = '답변 완료';
+    } else if (status == 'closed') {
+      bgColor = Colors.grey.shade100;
+      textColor = Colors.grey.shade600;
+      label = '종료';
+    } else {
+      bgColor = const Color(0xFFFFF8E1);
+      textColor = const Color(0xFFF57F17);
+      label = '검토중';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+/// R20: 답변 대기중 표시
+class _PendingBadge extends StatelessWidget {
+  const _PendingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.access_time_rounded,
+            size: 13, color: AppTheme.textSecondaryColor),
+        const SizedBox(width: 4),
+        Text(
+          '답변 대기중',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.textSecondaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// R20: 관리자 답변 블록
+class _ReplyBlock extends StatelessWidget {
+  final String reply;
+  final DateTime? repliedAt;
+  const _ReplyBlock({required this.reply, this.repliedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8E9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC8E6C9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.support_agent_rounded,
+                  size: 14, color: Color(0xFF388E3C)),
+              const SizedBox(width: 4),
+              const Text(
+                '뮤즐리 팀 답변',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF388E3C),
+                ),
+              ),
+              if (repliedAt != null) ...[
+                const Spacer(),
+                Text(
+                  _formatDate(repliedAt!),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF66BB6A),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            reply,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF1B5E20)),
           ),
         ],
       ),
