@@ -134,7 +134,7 @@ class ReviewScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ReviewFormSheet(
+      builder: (_) => ReviewFormSheet(
         museumId: museumId,
         visitId: visit.id,
         visitedAt: visit.visitedAt,
@@ -201,7 +201,7 @@ class ReviewScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ReviewFormSheet(
+      builder: (_) => ReviewFormSheet(
         museumId: museumId,
         visitId: review.visitId,
         isEdit: true,
@@ -947,7 +947,7 @@ class _StarRow extends StatelessWidget {
 
 // ─── 리뷰 작성/수정 폼 BottomSheet ─────────────────────────────────────────
 
-class _ReviewFormSheet extends StatefulWidget {
+class ReviewFormSheet extends StatefulWidget {
   final String museumId;
   final String visitId;
   final DateTime? visitedAt;
@@ -956,7 +956,8 @@ class _ReviewFormSheet extends StatefulWidget {
   final bool isEdit;
   final Future<void> Function(double rating, String content, DateTime? visitedOn) onSubmit; // R27
 
-  const _ReviewFormSheet({
+  const ReviewFormSheet({
+    super.key,
     required this.museumId,
     required this.visitId,
     this.visitedAt,
@@ -967,10 +968,10 @@ class _ReviewFormSheet extends StatefulWidget {
   });
 
   @override
-  State<_ReviewFormSheet> createState() => _ReviewFormSheetState();
+  State<ReviewFormSheet> createState() => _ReviewFormSheetState();
 }
 
-class _ReviewFormSheetState extends State<_ReviewFormSheet> {
+class _ReviewFormSheetState extends State<ReviewFormSheet> {
   late double _rating;
   late TextEditingController _contentController;
   bool _isSubmitting = false;
