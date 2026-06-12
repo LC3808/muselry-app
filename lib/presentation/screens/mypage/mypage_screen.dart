@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../config/router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/bookmark_provider.dart';
+import '../../providers/comment_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/visit_provider.dart';
 
@@ -23,6 +25,40 @@ class MypageScreen extends ConsumerWidget {
         title: const Text('마이페이지'),
         backgroundColor: AppTheme.surfaceColor,
         actions: [
+          // M5: 알림 버튼 + 빨간 점 뱃지
+          Consumer(
+            builder: (context, ref, _) {
+              final unreadAsync =
+                  ref.watch(unreadNotificationCountProvider);
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: '알림',
+                    onPressed: () => context.push(AppRoutes.notifications),
+                  ),
+                  unreadAsync.whenOrNull(
+                    data: (count) => count > 0
+                        ? Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE74C3C),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ) ??
+                      const SizedBox.shrink(),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: '설정',
@@ -970,6 +1006,13 @@ class _ActivitySection extends ConsumerWidget {
             label: '내가 쓴 리뷰',
             trailing: _ComingSoonBadge(),
             onTap: () {},
+          ),
+          Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
+          // M6: 문의/건의 진입점
+          _MenuItem(
+            icon: Icons.feedback_outlined,
+            label: '문의 / 건의',
+            onTap: () => context.push(AppRoutes.feedback),
           ),
         ],
       ),

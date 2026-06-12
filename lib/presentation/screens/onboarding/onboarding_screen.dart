@@ -121,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         _OnboardingPage(
                           title: '나만의 문화지도를\n완성하세요',
                           description:
-                              '박물관, 미술관, 과학관을\n나만의 문화지도로 기록하세요',
+                              '대한민국의 전시 공간을 나만의 문화지도로 기록하세요.' // R17,
                         ),
                       ],
                     ),

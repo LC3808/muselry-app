@@ -67,7 +67,18 @@ class ReviewRepository {
 
   // ── 조회 ──────────────────────────────────────────────────────────────────
 
-  /// 특정 박물관의 published 리뷰 목록 (작성자 프로필 조인, created_at DESC)
+  /// 단일 리뷰 조회 (R5: 알림 딥링크용)
+  Future<Review?> fetchReviewById(String reviewId) async {
+    final response = await _client
+        .from('reviews')
+        .select('*, profiles(nickname, avatar_url)')
+        .eq('id', reviewId)
+        .eq('status', 'published')
+        .maybeSingle();
+    if (response == null) return null;
+    return Review.fromJson(response);
+  }
+
   Future<List<Review>> fetchReviewsForMuseum(
     String museumId, {
     int limit = 20,

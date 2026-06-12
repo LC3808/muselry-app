@@ -17,6 +17,9 @@ import '../presentation/screens/mypage/mypage_screen.dart';
 import '../presentation/screens/visit/visit_history_screen.dart';
 import '../presentation/screens/review/review_screen.dart';
 import '../presentation/screens/review/my_reviews_screen.dart';
+import '../presentation/screens/notification/notification_screen.dart';
+import '../presentation/screens/review/review_detail_screen.dart';
+import '../presentation/screens/feedback/feedback_screen.dart';
 import '../presentation/widgets/common/main_scaffold.dart';
 
 // 라우트 경로 상수
@@ -36,6 +39,9 @@ class AppRoutes {
   static const String myReviews = '/my-reviews';
   static const String mypageMap = '/mypage/map';
   static const String bookmarks = '/mypage/bookmarks';
+  static const String notifications = '/notifications';
+  static const String feedback = '/feedback';
+  static const String reviewDetail = '/reviews/:reviewId';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -165,6 +171,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.bookmarks,
         builder: (context, state) => const BookmarksScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        builder: (context, state) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.feedback,
+        // R20: tab 쿼리파라미터 지원 — '1'이면 '내 문의 내역' 탭으로 직접 이동
+        builder: (context, state) {
+          final tabParam = state.uri.queryParameters['tab'];
+          final initialTab = tabParam == '1' ? 1 : 0;
+          return FeedbackScreen(initialTab: initialTab);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.reviewDetail,
+        builder: (context, state) {
+          final reviewId = state.pathParameters['reviewId']!;
+          // R13: 알림 딥링크에서 commentId 쿼리파라미터 전달
+          final commentId = state.uri.queryParameters['commentId'];
+          return ReviewDetailScreen(
+            reviewId: reviewId,
+            highlightCommentId: commentId,
+          );
+        },
       ),
     ],
   );

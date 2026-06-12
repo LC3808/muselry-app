@@ -48,6 +48,8 @@ class Museum {
   final bool isKidsFriendly;
   final String? kidsNote;
   final String? kidsCategory; // 'dedicated' | 'friendly' | null
+  /// M3: Bayesian 보정 별점 (DB 콜럼: bayesian_score)
+  final double? bayesianScore;
 
   const Museum({
     required this.id,
@@ -74,6 +76,7 @@ class Museum {
     this.isKidsFriendly = false,
     this.kidsNote,
     this.kidsCategory,
+    this.bayesianScore,
   });
 
   factory Museum.fromJson(Map<String, dynamic> json) {
@@ -103,6 +106,7 @@ class Museum {
       isKidsFriendly: json['is_kids_friendly'] as bool? ?? false,
       kidsNote: json['kids_note'] as String?,
       kidsCategory: json['kids_category'] as String?,
+      bayesianScore: (json['bayesian_score'] as num?)?.toDouble(),
     );
   }
 
@@ -131,6 +135,7 @@ class Museum {
         'is_kids_friendly': isKidsFriendly,
         'kids_note': kidsNote,
         'kids_category': kidsCategory,
+        'bayesian_score': bayesianScore,
       };
 
   Museum copyWith({
@@ -158,6 +163,7 @@ class Museum {
     bool? isKidsFriendly,
     String? kidsNote,
     String? kidsCategory,
+    double? bayesianScore,
   }) {
     return Museum(
       id: id ?? this.id,
@@ -184,6 +190,7 @@ class Museum {
       isKidsFriendly: isKidsFriendly ?? this.isKidsFriendly,
       kidsNote: kidsNote ?? this.kidsNote,
       kidsCategory: kidsCategory ?? this.kidsCategory,
+      bayesianScore: bayesianScore ?? this.bayesianScore,
     );
   }
 

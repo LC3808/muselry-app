@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../config/router.dart';
 import '../../../core/errors/auth_required_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +9,7 @@ import '../../../data/repositories/review_repository.dart';
 import '../../../domain/models/review.dart';
 import '../../../domain/models/visit.dart';
 import '../../../presentation/providers/auth_provider.dart';
+import '../../../presentation/providers/comment_provider.dart';
 import '../../../presentation/providers/review_provider.dart';
 import '../../../presentation/providers/visit_provider.dart';
 
@@ -62,6 +65,11 @@ class ReviewScreen extends ConsumerWidget {
                     : () => _showLoginRequired(context),
               );
             }
+            // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
+            final reviewIdsKey = reviews.map((r) => r.id).join(',');
+            final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
+            final counts = countsAsync.valueOrNull ?? {};
+
             return ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: reviews.length,
@@ -72,6 +80,10 @@ class ReviewScreen extends ConsumerWidget {
                 return _ReviewCard(
                   review: review,
                   isMyReview: isMyReview,
+                  commentCount: counts[review.id],
+                  onTap: () => context.push(
+                    AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
+                  ),
                   onEdit: isMyReview
                       ? () => _showEditBottomSheet(context, ref, review)
                       : null,
@@ -693,6 +705,8 @@ class _VisitSelectTile extends StatelessWidget {
 class _ReviewCard extends StatelessWidget {
   final Review review;
   final bool isMyReview;
+  final int? commentCount; // R22: 댓글 수 맱지
+  final VoidCallback? onTap; // R22: 단일 리뷰 화면으로 이동
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
@@ -700,6 +714,8 @@ class _ReviewCard extends StatelessWidget {
   const _ReviewCard({
     required this.review,
     required this.isMyReview,
+    this.commentCount,
+    this.onTap,
     this.onEdit,
     this.onDelete,
     this.onReport,
@@ -709,121 +725,139 @@ class _ReviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _Avatar(
-                  avatarUrl: review.authorAvatarUrl,
-                  nickname: review.authorNickname ?? '익명',
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        review.authorNickname ?? '익명',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+      clipBehavior: Clip.antiAlias, // R22: InkWell 리플 클립
+      child: InkWell(
+        onTap: onTap, // R22: 리뷰 상세 화면으로 이동
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _Avatar(
+                    avatarUrl: review.authorAvatarUrl,
+                    nickname: review.authorNickname ?? '익명',
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          review.authorNickname ?? '익명',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        _StarRow(rating: review.rating),
+                      ],
+                    ),
+                  ),
+                  if (review.status == ReviewStatus.pendingReview)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '검토 중',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange.shade800,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      _StarRow(rating: review.rating),
-                    ],
-                  ),
-                ),
-                if (review.status == ReviewStatus.pendingReview)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(
-                      '검토 중',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                if (isMyReview)
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 18),
-                    onSelected: (value) {
-                      if (value == 'edit') onEdit?.call();
-                      if (value == 'delete') onDelete?.call();
-                    },
-                    itemBuilder: (_) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        enabled: review.isEditable,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.edit_outlined,
-                              size: 16,
-                              color: review.isEditable
-                                  ? null
-                                  : AppTheme.textSecondaryColor,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              review.isEditable
-                                  ? '수정 (${review.editableDaysLeft}일 남음)'
-                                  : '수정 불가 (7일 경과)',
-                              style: TextStyle(
+                  if (isMyReview)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 18),
+                      onSelected: (value) {
+                        if (value == 'edit') onEdit?.call();
+                        if (value == 'delete') onDelete?.call();
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          enabled: review.isEditable,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.edit_outlined,
+                                size: 16,
                                 color: review.isEditable
                                     ? null
                                     : AppTheme.textSecondaryColor,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Text(
+                                review.isEditable
+                                    ? '수정 (${review.editableDaysLeft}일 남음)'
+                                    : '수정 불가 (7일 경과)',
+                                style: TextStyle(
+                                  color: review.isEditable
+                                      ? null
+                                      : AppTheme.textSecondaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline,
-                                size: 16, color: AppTheme.errorColor),
-                            SizedBox(width: 8),
-                            Text('삭제',
-                                style:
-                                    TextStyle(color: AppTheme.errorColor)),
-                          ],
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline,
+                                  size: 16, color: AppTheme.errorColor),
+                              SizedBox(width: 8),
+                              Text('삭제',
+                                  style: TextStyle(
+                                      color: AppTheme.errorColor)),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  )
-                else if (onReport != null)
-                  IconButton(
-                    icon: const Icon(Icons.flag_outlined, size: 18),
-                    tooltip: '신고',
-                    color: AppTheme.textSecondaryColor,
-                    onPressed: onReport,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              review.content,
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _formatDate(review.createdAt),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondaryColor,
+                      ],
+                    )
+                  else if (onReport != null)
+                    IconButton(
+                      icon: const Icon(Icons.flag_outlined, size: 18),
+                      tooltip: '신고',
+                      color: AppTheme.textSecondaryColor,
+                      onPressed: onReport,
+                    ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              Text(
+                review.content,
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              // R22: 날짜 + 댓글 수 뱃지 Row
+              Row(
+                children: [
+                  Text(
+                    _formatDate(review.createdAt),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  ),
+                  if ((commentCount ?? 0) > 0) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '💬$commentCount',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

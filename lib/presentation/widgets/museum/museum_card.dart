@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/app_dimensions.dart';
 import '../../../domain/models/museum.dart';
+import 'museum_image.dart';
 
 class MuseumCard extends StatelessWidget {
   final Museum museum;
@@ -53,20 +54,16 @@ class MuseumCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 이미지 영역
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: museum.imageUrl != null
-                    ? Image.network(
-                        museum.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            _buildPlaceholder(context),
-                      )
-                    : _buildPlaceholder(context),
+            // M2: MuseumImage 공용 위젯 사용 (dedicated 우선 fallback)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: MuseumImage(
+                imageUrl: museum.imageUrl,
+                type: museum.type,
+                kidsCategory: museum.kidsCategory,
+                fit: BoxFit.cover,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16)),
               ),
             ),
             // 정보 영역
@@ -158,6 +155,26 @@ class MuseumCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // R21: 별점 표시 (average_rating + review_count, 0건 생략)
+                  if ((museum.reviewCount ?? 0) > 0) ...
+                    [
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              size: 14, color: Color(0xFFF5A623)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${museum.averageRating!.toStringAsFixed(1)} (${museum.reviewCount})',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFFF5A623),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   const SizedBox(height: 8),
                   // 관람료 + 운영시간 (패턴 B: 요약 텍스트 + Expanded)
                   Row(
@@ -207,34 +224,6 @@ class MuseumCard extends StatelessWidget {
                     ],
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder(BuildContext context) {
-    return Container(
-      color: const Color(0xFF2C3E50).withValues(alpha: 0.08),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              museum.typeLabel == '미술관'
-                  ? Icons.palette_outlined
-                  : Icons.museum_outlined,
-              size: 40,
-              color: const Color(0xFF2C3E50).withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              museum.typeLabel,
-              style: TextStyle(
-                color: const Color(0xFF2C3E50).withValues(alpha: 0.4),
-                fontSize: 12,
               ),
             ),
           ],

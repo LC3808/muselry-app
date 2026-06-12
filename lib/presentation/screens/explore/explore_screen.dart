@@ -1,10 +1,10 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/museum_provider.dart';
-import '../../providers/bookmark_provider.dart'; // bookmarkedIdsProvider, bookmarksProvider
+import '../../providers/bookmark_provider.dart';
 import '../../widgets/museum/museum_card.dart';
 
 class ExploreScreen extends ConsumerStatefulWidget {
@@ -20,19 +20,22 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   // C4 수정: 검색 디바운싱 타이머 (350ms)
   Timer? _searchDebounce;
 
+  // R1: 위치 좌표 캐시 (거리순 RPC용)
+  double? _cachedLat;
+  double? _cachedLng;
+
   // v1.9: 유형 필터 (기념관/전시관 제외)
   static const _typeFilters = ['전체', '박물관', '미술관', '과학관'];
   // v1.8: 운영 필터 (공공=국립+공립, 민간=사립+대학+기업)
-  static const _ownershipFilters = ['전체', '공공', '민간'];
+  // R3: ownership 필터 UI MVP 숨김 — 상수도 주석 처리
+  // static const _ownershipFilters = ['전체', '공공', '민간'];
 
   @override
   void initState() {
     super.initState();
-    // 초기 데이터 로드
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitial();
     });
-    // 무한 스크롤: 하단 200px 이내 진입 시 추가 로드
     _scrollController.addListener(_onScroll);
   }
 
@@ -45,6 +48,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ownership: filter.selectedOwnership == '전체' ? null : filter.selectedOwnership,
           isKidsFriendly: filter.isKidsFriendly ? true : null,
           isFree: filter.isFree ? true : null,
+          sortOrder: filter.sortOrder,
+          lat: _cachedLat,
+          lng: _cachedLng,
         );
   }
 
@@ -61,15 +67,65 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ownership: filter.selectedOwnership == '전체' ? null : filter.selectedOwnership,
             isKidsFriendly: filter.isKidsFriendly ? true : null,
             isFree: filter.isFree ? true : null,
+            sortOrder: filter.sortOrder,
+            lat: _cachedLat,
+            lng: _cachedLng,
           );
     }
   }
 
   void _onFilterChanged() {
-    // 필터 변경 시 목록 초기화 후 재로드
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitial();
     });
+  }
+
+  /// R1: 거리순 칩 탭 시 위치 권한 요청 + 좌표 획득
+  Future<void> _onDistanceSortSelected() async {
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever ||
+          perm == LocationPermission.denied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('위치 권한이 필요합니다. 설정에서 허용해주세요.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        // fallback: relevance로 복교
+        ref.read(exploreFilterProvider.notifier).setSortOrder(SortOrder.relevance);
+        _onFilterChanged();
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _cachedLat = pos.latitude;
+        _cachedLng = pos.longitude;
+      });
+      ref.read(exploreFilterProvider.notifier).setSortOrder(SortOrder.distance);
+      _onFilterChanged();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('위치를 가져오지 못했어요. 다시 시도해주세요.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      ref.read(exploreFilterProvider.notifier).setSortOrder(SortOrder.relevance);
+      _onFilterChanged();
+    }
   }
 
   // C4 수정: 검색 디바운싱 메서드
@@ -83,7 +139,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel(); // C4 수정: 타이머 정리
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -96,6 +152,24 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     final filter = ref.watch(exploreFilterProvider);
     final listState = ref.watch(museumListProvider);
     final regionsAsync = ref.watch(regionsProvider);
+
+    // R11: 지도 배지 탭 → 탐색 화면 검색어 동기화
+    // exploreFilterProvider.searchQuery가 외부(지도)에서 변경되면
+    // _searchController.text를 동기화하고 목록을 갱신한다.
+    ref.listen<ExploreFilter>(exploreFilterProvider, (prev, next) {
+      if (prev?.searchQuery != next.searchQuery) {
+        final newQuery = next.searchQuery;
+        if (_searchController.text != newQuery) {
+          _searchController.text = newQuery;
+          _searchController.selection = TextSelection.fromPosition(
+            TextPosition(offset: newQuery.length),
+          );
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _loadInitial();
+        });
+      }
+    });
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -125,7 +199,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     const SizedBox(height: 8),
                     _SearchBar(
                       controller: _searchController,
-                      onChanged: _onSearchChanged, // C4 수정: 디바운싱 적용
+                      onChanged: _onSearchChanged,
                       onClear: () {
                         _searchController.clear();
                         ref
@@ -140,7 +214,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
 
-          // ─── 지역 필터 ──────────────────────────────────────────────────
+          // ─── R2: 지역 필터 (순서: 지역 → 유형 → 운영(MVP숨김) → 추천태그) ───
           SliverToBoxAdapter(
             child: regionsAsync.when(
               data: (regions) => _RegionFilterBar(
@@ -156,7 +230,70 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
 
-          // ─── v1.8: 추천 태그 줄 (유형 필터와 분리) ──────────────────────
+          // ─── R2: 유형 필터 ────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '유형',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[500],
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: _typeFilters.map((t) {
+                      final isSelected = filter.selectedType == t;
+                      return ChoiceChip(
+                        label: Text(t),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          ref.read(exploreFilterProvider.notifier).setType(t);
+                          _onFilterChanged();
+                        },
+                        selectedColor: const Color(0xFF2C3E50).withValues(alpha: 0.12),
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? const Color(0xFF2C3E50)
+                              : Colors.grey[600],
+                          fontSize: 13,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: isSelected
+                                ? const Color(0xFF2C3E50)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  // R3: 공공/민간(ownership) 필터 UI MVP 숨김
+                  // TODO: 출시 후 ownership 전수조사 완료 시 아래 주석 해제
+                  // Text('운영', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[500], letterSpacing: 0.3)),
+                  // const SizedBox(height: 6),
+                  // Wrap(spacing: 8, children: _ownershipFilters.map((o) { ... }).toList()),
+                  // const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+
+          // ─── R2: 추천 태그 ────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -200,26 +337,26 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                           side: BorderSide(
                             color: filter.isKidsFriendly
                                 ? const Color(0xFF27AE60)
-                                : Colors.grey[300]!,
+                                : Colors.grey.shade300,
                           ),
                         ),
-                        backgroundColor: Colors.transparent,
-                        showCheckmark: false,
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),
-                      // v1.9 이슈 7: 무료 관람 태그
+                      // v1.9 이슈 7: 무료 관람 필터
                       FilterChip(
                         label: const Text('무료 관람'),
-                        avatar: const Text('🆓', style: TextStyle(fontSize: 14)),
+                        avatar: const Text('🎫', style: TextStyle(fontSize: 14)),
                         selected: filter.isFree,
                         onSelected: (val) {
                           ref.read(exploreFilterProvider.notifier).setFree(val);
                           _onFilterChanged();
                         },
-                        selectedColor: const Color(0xFF3498DB).withValues(alpha: 0.15),
-                        checkmarkColor: const Color(0xFF3498DB),
+                        selectedColor: const Color(0xFF1565C0).withValues(alpha: 0.12),
+                        checkmarkColor: const Color(0xFF1565C0),
                         labelStyle: TextStyle(
                           color: filter.isFree
-                              ? const Color(0xFF3498DB)
+                              ? const Color(0xFF1565C0)
                               : Colors.grey[600],
                           fontSize: 13,
                           fontWeight: filter.isFree
@@ -230,12 +367,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                           borderRadius: BorderRadius.circular(20),
                           side: BorderSide(
                             color: filter.isFree
-                                ? const Color(0xFF3498DB)
-                                : Colors.grey[300]!,
+                                ? const Color(0xFF1565C0)
+                                : Colors.grey.shade300,
                           ),
                         ),
-                        backgroundColor: Colors.transparent,
-                        showCheckmark: false,
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),
                     ],
                   ),
@@ -244,102 +381,72 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
 
-          // ─── v1.8: 유형 필터 줄 (museums.type 기준) ────────────────────
+
+          // ─── M3: 정렬 칩 UI ──────────────────────────────────────────────
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '유형',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[500],
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _TypeFilterBar(
-              types: _typeFilters,
-              selectedType: filter.selectedType,
-              onTypeSelected: (type) {
-                ref.read(exploreFilterProvider.notifier).setType(type);
-                _onFilterChanged();
+            child: _SortChipBar(
+              current: filter.sortOrder,
+              onChanged: (order) {
+                if (order == SortOrder.distance) {
+                  // R1: 거리순은 위치 권한 요청 후 RPC 호출
+                  _onDistanceSortSelected();
+                } else {
+                  // 거리순 해제 시 좌표 캐시 삭제
+                  setState(() {
+                    _cachedLat = null;
+                    _cachedLng = null;
+                  });
+                  ref.read(exploreFilterProvider.notifier).setSortOrder(order);
+                  _onFilterChanged();
+                }
               },
             ),
           ),
 
-          // ─── v1.8: 운영 필터 줄 (공공/민간 그룹핑) ─────────────────────
+          // ─── 결과 수 + 필터 초기화 ──────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '운영',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[500],
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _OwnershipFilterBar(
-              ownerships: _ownershipFilters,
-              selectedOwnership: filter.selectedOwnership,
-              onOwnershipSelected: (ownership) {
-                ref.read(exploreFilterProvider.notifier).setOwnership(ownership);
-                _onFilterChanged();
-              },
-            ),
-          ),
-
-          // ─── 결과 수 + 필터 초기화 ──────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
               child: Row(
                 children: [
                   Text(
-                    listState.museums.isEmpty && listState.isLoading
-                        ? '로딩 중...'
-                        : '전 ${listState.museums.length}곳${listState.hasMore ? '+' : ''}',
-                    style: theme.textTheme.bodySmall?.copyWith(
+                    '${listState.museums.length}곳',
+                    style: TextStyle(
+                      fontSize: 13,
                       color: Colors.grey[600],
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (filter.hasActiveFilter) ...[
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
                         _searchController.clear();
                         ref.read(exploreFilterProvider.notifier).reset();
                         _onFilterChanged();
                       },
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text(
-                        '필터 초기화',
-                        style:
-                            TextStyle(color: Color(0xFFE8A87C), fontSize: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.close,
+                                size: 12, color: Colors.grey[600]),
+                            const SizedBox(width: 3),
+                            Text(
+                              '필터 초기화',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -390,7 +497,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   final museum = listState.museums[index];
                   return Consumer(
                     builder: (context, ref, _) {
-                      // W3 수정: bookmarkedIdsProvider로 O(1) 조회
                       final isBookmarked = ref
                           .watch(bookmarkedIdsProvider)
                           .contains(museum.id);
@@ -502,135 +608,22 @@ class _RegionFilterBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF2C3E50)
-                    : Colors.grey[100],
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF2C3E50)
+                      : Colors.grey.shade300,
+                ),
               ),
               child: Text(
                 region,
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.grey[700],
                   fontSize: 13,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ─── 유형 필터 바 ─────────────────────────────────────────────────────────────
-class _TypeFilterBar extends StatelessWidget {
-  final List<String> types;
-  final String selectedType;
-  final ValueChanged<String> onTypeSelected;
-
-  const _TypeFilterBar(
-      {required this.types,
-      required this.selectedType,
-      required this.onTypeSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        itemCount: types.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final type = types[index];
-          final isSelected = type == selectedType;
-          return GestureDetector(
-            onTap: () => onTypeSelected(type),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFFE8A87C).withValues(alpha: 0.15)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFFE8A87C)
-                      : Colors.grey[300]!,
-                ),
-              ),
-              child: Text(
-                type,
-                style: TextStyle(
-                  color: isSelected
-                      ? const Color(0xFFE8A87C)
-                      : Colors.grey[600],
-                  fontSize: 13,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ─── v1.8: 운영 필터 바 ───────────────────────────────────────────────────────
-/// 운영 주체 그룹핑 필터: 전체 / 공공(국립+공립) / 민간(사립+대학+기업)
-/// DB ownership 원본 값은 유지하며 UI에서만 그룹핑 표시.
-class _OwnershipFilterBar extends StatelessWidget {
-  final List<String> ownerships;
-  final String selectedOwnership;
-  final ValueChanged<String> onOwnershipSelected;
-
-  const _OwnershipFilterBar({
-    required this.ownerships,
-    required this.selectedOwnership,
-    required this.onOwnershipSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        itemCount: ownerships.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final ownership = ownerships[index];
-          final isSelected = ownership == selectedOwnership;
-          // 운영 필터 색상: 남색 계열로 유형 필터(주황)와 시각적 구분
-          const activeColor = Color(0xFF1565C0);
-          return GestureDetector(
-            onTap: () => onOwnershipSelected(ownership),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? activeColor.withValues(alpha: 0.12)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isSelected ? activeColor : Colors.grey[300]!,
-                ),
-              ),
-              child: Text(
-                ownership,
-                style: TextStyle(
-                  color: isSelected ? activeColor : Colors.grey[600],
-                  fontSize: 13,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                 ),
               ),
             ),
@@ -654,20 +647,91 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
+          const Icon(Icons.search_off, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           Text(
-            query.isNotEmpty
-                ? '"$query" 검색 결과가 없습니다'
-                : '조건에 맞는 박물관이 없습니다',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Colors.grey[500]),
+            query.isNotEmpty ? '"$query" 검색 결과가 없습니다' : '조건에 맞는 박물관이 없습니다',
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          TextButton(onPressed: onReset, child: const Text('전체 보기')),
+          TextButton(
+            onPressed: onReset,
+            child: const Text('필터 초기화'),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── M3: 정렬 칩 바 ──────────────────────────────────────────────────────────
+class _SortChipBar extends StatelessWidget {
+  final SortOrder current;
+  final ValueChanged<SortOrder> onChanged;
+
+  const _SortChipBar({required this.current, required this.onChanged});
+
+  // R23: 인기순 숨김 — static 인기 데이터 미적재, 출시 후 관람객 통계 적재 시 부활
+  // 원본: (label: '인기순', order: SortOrder.popularity)
+  static const _items = [
+    (label: '관련도', order: SortOrder.relevance),
+    (label: '거리순', order: SortOrder.distance),
+    (label: '별점순', order: SortOrder.rating),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = _items[index];
+          final isSelected = current == item.order;
+          return GestureDetector(
+            onTap: () => onChanged(item.order),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF2C3E50)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF2C3E50)
+                      : Colors.grey.shade300,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSelected) ...[
+                    const Icon(Icons.check,
+                        size: 12, color: Colors.white),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[700],
+                      fontSize: 13,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
