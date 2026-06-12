@@ -9,13 +9,18 @@ import '../../providers/museum_provider.dart';
 import '../../providers/visit_provider.dart';
 
 // ─── 색상 상수 ────────────────────────────────────────────────────────────────
-// M7-C: 방문=빨강(#D32F2F), 북마크=파랑(#1565C0) — 범례와 1:1 일치
-// M7-G-2 TODO: 운영자 확정 색상 코드 수령 후 아래 두 상수 수정
-// 현재: 방문=#D32F2F(빨강), 북마크=#1565C0(파랑)
-// 후보: 방문=#F58220(주황/액센트), 북마크=#7CB342(연두) 또는 #4FC3F7(하늘)
-const _kVisitedTintColor = Color(0xFFD32F2F); // TODO M7-G-2: 운영자 확정 후 주황 계열로 교체
-const _kBookmarkTintColor = Color(0xFF1565C0); // TODO M7-G-2: 운영자 확정 후 연두/하늘로 교체
+// M7-G-2 확정 (2026-06-13): 운영자 확정 색상 적용
+// 방문 = Orange 700 (#F57C00) — 뮤즐리 메인 주황
+// 북마크 = Light Blue 400 (#29B6F6) — 차가운 하늘
+// 칩·범례·통계·바텀시트 모두 아래 상수 자동 참조
+const _kVisitedTintColor = Color(0xFFF57C00); // Orange 700 — 방문 마커/칩/범례
+const _kBookmarkTintColor = Color(0xFF29B6F6); // Light Blue 400 — 북마크 마커/칩/범례
 const _kDefaultColor = Color(0xFFBDBDBD); // 미방문 마커 (회색)
+
+// 유형별 색상 (탐색 지도 type 색상과 1:1 일치 — _TypeBadge 전용)
+const _kMuseumTypeColor = Color(0xFF388E3C); // 박물관 — 초록
+const _kGalleryTypeColor = Color(0xFFFFB300); // 미술관 — 앰버
+const _kScienceTypeColor = Color(0xFFD32F2F); // 과학관 — 빨강
 
 // ─── 필터 열거형 ──────────────────────────────────────────────────────────────
 enum _MapFilter { all, visited, bookmarked }
@@ -1065,7 +1070,12 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = type == '미술관' ? Colors.purple.shade400 : _kVisitedTintColor;
+    // M7-G-2: 유형별 고유 색상 (탐색 지도 type 색상과 1:1 일치)
+    final color = type == '박물관'
+        ? _kMuseumTypeColor
+        : type == '미술관'
+            ? _kGalleryTypeColor
+            : _kScienceTypeColor; // 과학관 (기본)
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
