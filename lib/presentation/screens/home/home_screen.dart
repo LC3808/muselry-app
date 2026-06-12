@@ -44,9 +44,11 @@ class HomeScreen extends ConsumerWidget {
                 // ── 인사말 배너 ──────────────────────────────────────────
                 _GreetingBanner(displayName: displayName),
 
+                const SizedBox(height: 24), // M7-G-7: 인사말↔그리드 간격 (f3dca0d 원본값)
+
                 // ── 빠른 탐색 버튼 그리드 (M7-G-1: 헤더 없이 4버튼만) ────────────
                 _QuickAccessGrid(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 32), // M7-G-7: 그리드↔인기 장소 간격 (f3dca0d 원본값)
 
                 // ── 인기 장소 섹션 ─────────────────────────────────────
                 Row(
