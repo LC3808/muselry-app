@@ -18,7 +18,11 @@ final commentsForReviewProvider = FutureProvider.family<List<Comment>, String>(
   },
 );
 
-// ── 댓글 CRUD Notifier ────────────────────────────────────────────────────────
+// ── 댓글 CRUD Notifier (R25 fix: family로 변경 — review_id별 독립 인스턴스) ────────
+//
+// 버그 원인: 기존 commentListProvider는 NotifierProvider(싱글턴)였음.
+// 여러 리뷰 카드가 동일 인스턴스를 watch하여 마지막 fetch된 댓글이 모든 카드에 표시됨.
+// 수정: NotifierProvider.family<..., String>으로 변경 → review_id별 분리.
 
 class CommentListState {
   final List<Comment> comments;
@@ -44,16 +48,18 @@ class CommentListState {
   }
 }
 
-class CommentListNotifier extends Notifier<CommentListState> {
+// R25 fix: FamilyNotifier — 각 review_id마다 독립 인스턴스 생성
+class CommentListNotifier extends FamilyNotifier<CommentListState, String> {
   @override
-  CommentListState build() => const CommentListState();
+  CommentListState build(String reviewId) => const CommentListState();
 
   CommentRepository get _repo => ref.read(commentRepositoryProvider);
 
-  Future<void> fetchComments(String reviewId) async {
+  // arg == reviewId (build 인자)
+  Future<void> fetchComments() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final comments = await _repo.fetchCommentsForReview(reviewId);
+      final comments = await _repo.fetchCommentsForReview(arg);
       state = state.copyWith(comments: comments, isLoading: false);
     } catch (e) {
       state = state.copyWith(
@@ -63,21 +69,17 @@ class CommentListNotifier extends Notifier<CommentListState> {
     }
   }
 
-  Future<void> addComment({
-    required String reviewId,
-    required String content,
-  }) async {
+  Future<void> addComment({required String content}) async {
     final comment = await _repo.createComment(
-      reviewId: reviewId,
+      reviewId: arg,
       content: content,
     );
     state = state.copyWith(
       comments: [...state.comments, comment],
     );
-    // 알림 밿지 갱신
+    // 알림 뱃지 갱신
     ref.invalidate(unreadNotificationCountProvider);
     // R22 fix: 커뮤니티 피드 ↔ 시설 리뷰 목록 댓글 수 동기화
-    // commentCountsProvider는 family이므로 invalidate 시 모든 인스턴스 새로고침
     ref.invalidate(commentCountsProvider);
   }
 
@@ -106,8 +108,9 @@ class CommentListNotifier extends Notifier<CommentListState> {
   }
 }
 
+// R25 fix: NotifierProvider → NotifierProvider.family (review_id 키)
 final commentListProvider =
-    NotifierProvider<CommentListNotifier, CommentListState>(
+    NotifierProvider.family<CommentListNotifier, CommentListState, String>(
   CommentListNotifier.new,
 );
 

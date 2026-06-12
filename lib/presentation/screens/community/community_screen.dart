@@ -172,9 +172,10 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
     setState(() => _showComments = !_showComments);
     if (!_commentsLoaded) {
       _commentsLoaded = true;
+      // R25 fix: family provider에 review_id 전달 → 각 카드 독립 인스턴스
       ref
-          .read(commentListProvider.notifier)
-          .fetchComments(widget.review.id);
+          .read(commentListProvider(widget.review.id).notifier)
+          .fetchComments();
     }
   }
 
@@ -420,14 +421,13 @@ class _CommentSectionState extends ConsumerState<_CommentSection> {
     setState(() => _isSubmitting = true);
     try {
       if (_editingCommentId != null) {
-        await ref.read(commentListProvider.notifier).editComment(
+        await ref.read(commentListProvider(widget.reviewId).notifier).editComment(
               commentId: _editingCommentId!,
               content: content,
             );
         _editingCommentId = null;
       } else {
-        await ref.read(commentListProvider.notifier).addComment(
-              reviewId: widget.reviewId,
+        await ref.read(commentListProvider(widget.reviewId).notifier).addComment(
               content: content,
             );
       }
@@ -479,13 +479,14 @@ class _CommentSectionState extends ConsumerState<_CommentSection> {
       ),
     );
     if (confirmed == true) {
-      await ref.read(commentListProvider.notifier).removeComment(commentId);
+      await ref.read(commentListProvider(widget.reviewId).notifier).removeComment(commentId);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(commentListProvider);
+    // R25 fix: family provider에 reviewId 전달 → 자신의 댓글만 watch
+    final state = ref.watch(commentListProvider(widget.reviewId));
 
     return Container(
       decoration: BoxDecoration(

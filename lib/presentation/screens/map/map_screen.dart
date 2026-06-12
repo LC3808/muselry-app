@@ -12,10 +12,11 @@ import '../../providers/museum_provider.dart';
 // 앱 색상 상수
 const _kNavy = Color(0xFF2C3E50);
 
-// R14: type별 마커 색상 — 3종 노출(박물관=초록, 미술관=파랑, 과학관=빨강)
+// R14: type별 마커 색상 — 3종 노출(박물관=초록, 미술관=앰버, 과학관=빨강)
+// R26: 미술관 파랑(#1565C0) → 앰버(#FFB300) — 지도에서 박물관 초록과 구분 강화
 // 기념관/전시관은 예약값으로 상수만 유지, 마커는 미노출
 const _kColorMuseum = Color(0xFF388E3C);   // 초록
-const _kColorArt    = Color(0xFF1565C0);   // 파랑
+const _kColorArt    = Color(0xFFFFB300);   // 앰버 (R26)
 const _kColorScience = Color(0xFFD32F2F);  // 빨강
 const _kColorMemorial = Color(0xFF00897B); // 예약값 (미노출)
 const _kColorExhibit  = Color(0xFFB8860B); // 예약값 (미노출)
