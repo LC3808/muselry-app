@@ -754,6 +754,10 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
+// M7-G-5-2: 비선택 상태에서 그룹 색 테두리 적용 (color 있는 칩만)
+// - 선택: 해당 색 fill + 흰 글자 (기존 동일)
+// - 비선택: 흰 배경 + 그룹 색 테두리(50% 투명도) + 검정 글자
+// - color 없는 칩(전체/기간): 회색 테두리 유지
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -770,6 +774,10 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeColor = color ?? AppTheme.primaryColor;
+    // 비선택 테두리: color 있으면 그룹 색 50% 투명도, 없으면 회색
+    final unselectedBorderColor = color != null
+        ? color!.withValues(alpha: 0.50)
+        : AppTheme.dividerColor;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -779,7 +787,7 @@ class _FilterChip extends StatelessWidget {
           color: selected ? activeColor : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? activeColor : AppTheme.dividerColor,
+            color: selected ? activeColor : unselectedBorderColor,
           ),
           boxShadow: [
             BoxShadow(
