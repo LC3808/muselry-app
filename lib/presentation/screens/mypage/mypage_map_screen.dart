@@ -286,7 +286,7 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                         size: 32, color: AppTheme.textSecondaryColor),
                     const SizedBox(height: 8),
                     const Text(
-                      '아직 방문하거나 북마크한 전시 공간이 없어요',
+                      '아직 기록된 공간이 없어요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -296,7 +296,7 @@ class _MypageMapScreenState extends ConsumerState<MypageMapScreen> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      '박물관·미술관·과학관을 방문하거나 북마크하면 여기에 표시됩니다',
+                      '방문한 공간을 기록하면 나만의 문화지도가 만들어져요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,

@@ -134,7 +134,7 @@ class _GreetingBanner extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '오늘은 어떤 전시 공간을 탐험해볼까요?', // §8-2
+            '오늘은 어떤 공간을 탐험해볼까요?', // §8-2 M7-F-2
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.7),
               fontSize: 13,
