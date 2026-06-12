@@ -155,6 +155,26 @@ class MuseumCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // R21: 별점 표시 (average_rating + review_count, 0건 생략)
+                  if ((museum.reviewCount ?? 0) > 0) ...
+                    [
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              size: 14, color: Color(0xFFF5A623)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${museum.averageRating!.toStringAsFixed(1)} (${museum.reviewCount})',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFFF5A623),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   const SizedBox(height: 8),
                   // 관람료 + 운영시간 (패턴 B: 요약 텍스트 + Expanded)
                   Row(

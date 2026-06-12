@@ -112,6 +112,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     if (state.reviews.isEmpty) {
       return _EmptyFeed();
     }
+    // R18: join 문자열을 family 키로 사용 (String == 정상 동작, List<String> 캐시 미스 해결)
+    final reviewIdsKey = state.reviews.map((r) => r.id).join(',');
+    final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
+    final counts = countsAsync.valueOrNull ?? {};
+
     return RefreshIndicator(
       onRefresh: () =>
           ref.read(communityReviewsProvider.notifier).fetchInitial(),
@@ -124,11 +129,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           if (index == state.reviews.length) {
             return const _FeedFooter();
           }
-          // R12: 현재 페이지의 리뷰 ID 목록으로 댓글 수 일괄 조회
-          final reviewIds = state.reviews.map((r) => r.id).toList();
-          final countsAsync = ref.watch(commentCountsProvider(reviewIds));
-          final counts = countsAsync.valueOrNull ?? {};
           return _ReviewFeedCard(
+            key: ValueKey('${reviewIdsKey}_$index'),
             review: state.reviews[index],
             currentUserId: currentUserId,
             commentCount: counts[state.reviews[index].id],
@@ -151,6 +153,7 @@ class _ReviewFeedCard extends ConsumerStatefulWidget {
   final void Function(String museumId) onMuseumTap;
 
   const _ReviewFeedCard({
+    super.key, // R18: ListView rebuild 시 key 지원
     required this.review,
     required this.currentUserId,
     this.commentCount,

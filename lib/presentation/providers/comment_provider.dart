@@ -106,14 +106,16 @@ final commentListProvider =
   CommentListNotifier.new,
 );
 
-// ── R12: 댓글 수 일괄 조회 Provider ──────────────────────────────────────────────
+// ── R12/R18: 댓글 수 일괄 조회 Provider ─────────────────────────────────────────
 
-/// 리뷰 ID 목록 → { reviewId: count } 맵 (단일 쿼리, N+1 방지)
+/// 리뷰 ID 목록(쉼표 join 문자열) → reviewId:count 맵 (단일 쿼리, N+1 방지)
+/// R18: family 키를 String으로 변경 — List(String)은 == 인스턴스 비교라 캐시 미스 발생
 final commentCountsProvider =
-    FutureProvider.family<Map<String, int>, List<String>>(
-  (ref, reviewIds) async {
+    FutureProvider.family<Map<String, int>, String>(
+  (ref, reviewIdsKey) async {
     final repo = ref.watch(commentRepositoryProvider);
-    return repo.fetchCommentCounts(reviewIds);
+    final ids = reviewIdsKey.isEmpty ? <String>[] : reviewIdsKey.split(',');
+    return repo.fetchCommentCounts(ids);
   },
 );
 
