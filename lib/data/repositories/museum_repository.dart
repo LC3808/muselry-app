@@ -32,11 +32,14 @@ class MuseumRepository {
         .eq('is_active', true);
 
     // W2 수정: 검색어 sanitize (trim + 최대 50자 제한)
+    // M9-2: name 필드만 매칭 (description/address 제외 — 무관련 결과 노출 방지)
+    String? sanitizedQuery;
     if (searchQuery != null && searchQuery.isNotEmpty) {
       final q = searchQuery.trim();
       final sanitized = q.length > 50 ? q.substring(0, 50) : q;
       if (sanitized.isNotEmpty) {
-        query = query.or('name.ilike.%$sanitized%,description.ilike.%$sanitized%,address.ilike.%$sanitized%');
+        sanitizedQuery = sanitized;
+        query = query.ilike('name', '%$sanitized%'); // M9-2: name 매칭만
       }
     }
 
@@ -103,6 +106,21 @@ class MuseumRepository {
             .range(offset, offset + limit - 1);
         result = (response as List).map((e) => Museum.fromJson(e)).toList();
         break;
+    }
+
+    // M9-2: 검색어 있을 때 relevance 모드에서 클라이언트 재정렬
+    // ① name이 검색어로 시작하는 항목 우선
+    // ② name에 검색어가 포함되는 항목
+    if (sanitizedQuery != null && sanitizedQuery.isNotEmpty && sortOrder == SortOrder.relevance) {
+      final kw = sanitizedQuery.toLowerCase();
+      result.sort((a, b) {
+        final aName = a.name.toLowerCase();
+        final bName = b.name.toLowerCase();
+        final aStarts = aName.startsWith(kw) ? 0 : 1;
+        final bStarts = bName.startsWith(kw) ? 0 : 1;
+        if (aStarts != bStarts) return aStarts - bStarts;
+        return aName.compareTo(bName);
+      });
     }
 
     return result;
