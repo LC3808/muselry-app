@@ -1295,7 +1295,8 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                 style: TextStyle(color: AppTheme.errorColor),
               ),
               onTap: () async {
-                Navigator.pop(context);
+                // fix: 시트 닫기 전에 다이얼로그 먼저 표시 (context 유효성 보장)
+                final navigator = Navigator.of(context);
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -1317,6 +1318,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                   ),
                 );
                 if (confirmed == true) {
+                  navigator.pop(); // 확인 후 시트 닫기
                   await ref.read(authNotifierProvider.notifier).signOut();
                 }
               },
