@@ -554,15 +554,7 @@ class _LevelBar extends StatelessWidget {
 
   const _LevelBar({required this.level});
 
-  // M9-3: 레벨 안내 테이블 데이터 (profile_provider.dart 상수와 1:1 일치)
-  static const _levelGuide = [
-    (1, 'Lv.1 문화 새싹',    '1~5곳'),
-    (2, 'Lv.2 문화 산책자',  '6~10곳'),
-    (3, 'Lv.3 문화 탐험가',  '11~20곳'),
-    (4, 'Lv.4 문화 애호가',  '21~35곳'),
-    (5, 'Lv.5 문화 큐레이터','36~56곳'),
-    (6, 'Lv.6 문화 마스터',  '57곳~'),
-  ];
+  // M9.2-1: 하드코딩 제거 — profile_provider.dart의 cultureLevelMeta 단일 소스 직접 참조
 
   void _showLevelGuide(BuildContext context) {
     showDialog(
@@ -575,7 +567,7 @@ class _LevelBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Divider(),
-            ..._levelGuide.map((e) {
+            ...cultureLevelMeta.map((e) { // M9.2-1: cultureLevelMeta 참조
               final isCurrentLevel = e.$1 == level.level;
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),

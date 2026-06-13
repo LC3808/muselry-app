@@ -259,6 +259,18 @@ CultureLevel computeCultureLevel(int distinctCount) {
   );
 }
 
+/// M9.2-1: 레벨 메타데이터 단일 소스 — 다이얼로그 등 외부 참조용 공개 상수.
+/// (level, title, rangeLabel) — rangeLabel은 _levelStart 기반으로 자동 계산.
+/// 이 리스트를 수정하면 다이얼로그 표시도 자동 반영됨.
+const List<(int, String, String)> cultureLevelMeta = [
+  (1, 'Lv.1 문화 새싹',     '1~5곳'),
+  (2, 'Lv.2 문화 산책자',   '6~10곳'),
+  (3, 'Lv.3 문화 탐험가',   '11~20곳'),
+  (4, 'Lv.4 문화 애호가',   '21~35곳'),
+  (5, 'Lv.5 문화 큐레이터', '36~60곳'), // M9.1-2 임계값 반영
+  (6, 'Lv.6 문화 마스터',   '61곳~'),   // M9.1-2 임계값 반영
+];
+
 /// visitStatsProvider에서 파생된 CultureLevel Provider.
 final cultureLevelProvider = Provider<CultureLevel>((ref) {
   final stats = ref.watch(visitStatsProvider);
