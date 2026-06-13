@@ -604,7 +604,7 @@ class _RegionFilterBar extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 0), // M9-1: 유형 칩과 통일
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF2C3E50)
@@ -620,7 +620,7 @@ class _RegionFilterBar extends StatelessWidget {
                 region,
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.grey[700],
-                  fontSize: 13,
+                  fontSize: 13, // M9-1: 유형 칩과 동일
                   fontWeight: isSelected
                       ? FontWeight.w600
                       : FontWeight.normal,

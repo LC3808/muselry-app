@@ -554,6 +554,90 @@ class _LevelBar extends StatelessWidget {
 
   const _LevelBar({required this.level});
 
+  // M9-3: 레벨 안내 테이블 데이터 (profile_provider.dart 상수와 1:1 일치)
+  static const _levelGuide = [
+    (1, 'Lv.1 문화 새싹',    '1~5곳'),
+    (2, 'Lv.2 문화 산책자',  '6~10곳'),
+    (3, 'Lv.3 문화 탐험가',  '11~20곳'),
+    (4, 'Lv.4 문화 애호가',  '21~35곳'),
+    (5, 'Lv.5 문화 큐레이터','36~56곳'),
+    (6, 'Lv.6 문화 마스터',  '57곳~'),
+  ];
+
+  void _showLevelGuide(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('문화 레벨 6단계',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Divider(),
+            ..._levelGuide.map((e) {
+              final isCurrentLevel = e.$1 == level.level;
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                decoration: isCurrentLevel
+                    ? BoxDecoration(
+                        color: _levelColor(e.$1).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      )
+                    : null,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        e.$2,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isCurrentLevel
+                              ? FontWeight.w700
+                              : FontWeight.normal,
+                          color: isCurrentLevel
+                              ? _levelColor(e.$1)
+                              : AppTheme.textPrimaryColor,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      e.$3,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isCurrentLevel
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                        color: isCurrentLevel
+                            ? _levelColor(e.$1)
+                            : AppTheme.textSecondaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text(
+                '기준: 다녀온 공간 수\n(같은 곳을 여러 번 방문해도 1곳으로 계산)',
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryColor),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final levelColor = _levelColor(level.level);
@@ -575,6 +659,18 @@ class _LevelBar extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: levelColor,
+                ),
+              ),
+              // M9-3: ⓘ 아이콘 — 탭 시 레벨 안내 다이얼로그
+              GestureDetector(
+                onTap: () => _showLevelGuide(context),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: levelColor.withValues(alpha: 0.7),
+                  ),
                 ),
               ),
               const Spacer(),
