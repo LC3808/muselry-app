@@ -601,29 +601,33 @@ class _RegionFilterBar extends StatelessWidget {
           final isSelected = region == selectedRegion;
           return GestureDetector(
             onTap: () => onRegionSelected(region),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 0), // M9-1: 유형 칩과 통일
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFF2C3E50)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 52), // M9.1-1: 알약 형태 보장
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0), // M9.1-1: horizontal 확대
+                decoration: BoxDecoration(
                   color: isSelected
                       ? const Color(0xFF2C3E50)
-                      : Colors.grey.shade300,
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF2C3E50)
+                        : Colors.grey.shade300,
+                  ),
                 ),
-              ),
-              child: Text(
-                region,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey[700],
-                  fontSize: 13, // M9-1: 유형 칩과 동일
-                  fontWeight: isSelected
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                child: Center(
+                  child: Text(
+                    region,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[700],
+                      fontSize: 13,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
                 ),
               ),
             ),
