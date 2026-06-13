@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // M8-3
 
 import '../../../config/router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -1205,13 +1206,63 @@ class _MenuItem extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // 설정 Bottom Sheet
 // ─────────────────────────────────────────────────────────────────────────────
-class _SettingsSheet extends ConsumerWidget {
-  final WidgetRef ref;
+class _SettingsSheet extends ConsumerStatefulWidget {
+  final WidgetRef outerRef;
 
-  const _SettingsSheet({required this.ref});
+  const _SettingsSheet({required WidgetRef ref}) : outerRef = ref;
 
   @override
-  Widget build(BuildContext context, WidgetRef widgetRef) {
+  ConsumerState<_SettingsSheet> createState() => _SettingsSheetState();
+}
+
+class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _appVersion = 'v${info.version}');
+    });
+  }
+
+  // M8-2: 1차 경고 모달
+  Future<bool> _showFirstWarning(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('계정을 삭제하시겠어요?'),
+        content: const Text(
+          '계정을 삭제하면 방문기록, 북마크, 리뷰, 댓글, 문의 내역이\n'
+          '함께 삭제되며 복구할 수 없습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('계속', style: TextStyle(color: AppTheme.errorColor)),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  // M8-2: 2차 최종 확인 모달 (체크박스 필수)
+  Future<bool> _showFinalConfirm(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _DeleteConfirmDialog(),
+    );
+    return result == true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1238,7 +1289,7 @@ class _SettingsSheet extends ConsumerWidget {
               leading: const Icon(Icons.info_outline),
               title: const Text('앱 정보'),
               trailing: Text(
-                'v0.2.0',
+                _appVersion.isEmpty ? 'v...' : _appVersion, // M8-3: 동적 버전
                 style: TextStyle(
                   fontSize: 13,
                   color: AppTheme.textSecondaryColor,
@@ -1280,9 +1331,109 @@ class _SettingsSheet extends ConsumerWidget {
                 }
               },
             ),
+            const Divider(height: 1),
+            // M8-2: 계정 삭제 메뉴 (가장 하단, 빨간색)
+            ListTile(
+              leading: Icon(Icons.delete_forever_outlined, color: AppTheme.errorColor),
+              title: Text(
+                '계정 삭제',
+                style: TextStyle(color: AppTheme.errorColor),
+              ),
+              onTap: () async {
+                Navigator.pop(context); // 시트 닫기
+                final first = await _showFirstWarning(context);
+                if (!first) return;
+                if (!context.mounted) return;
+                final final_ = await _showFinalConfirm(context);
+                if (!final_) return;
+                if (!context.mounted) return;
+
+                // RPC 호출 + signOut
+                try {
+                  await ref.read(authNotifierProvider.notifier).deleteAccount();
+                  // 라우터가 signedOut 이벤트를 감지하여 /login으로 자동 리다이렉트
+                  // 스낵바 표시를 위해 context가 아직 유효한 경우만 시도
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('계정이 삭제되었습니다.')),
+                    );
+                  }
+                } catch (e) {
+                  if (!context.mounted) return;
+                  final msg = e.toString().contains('네트워크')
+                      ? '네트워크 연결을 확인해 주세요'
+                      : '계정 삭제 중 오류가 발생했습니다. 문의를 통해 알려주세요';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(msg)),
+                  );
+                }
+              },
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// M8-2: 2차 최종 확인 다이얼로그 (체크박스 포함)
+class _DeleteConfirmDialog extends StatefulWidget {
+  const _DeleteConfirmDialog();
+
+  @override
+  State<_DeleteConfirmDialog> createState() => _DeleteConfirmDialogState();
+}
+
+class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
+  bool _agreed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('정말 삭제하시겠어요?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('이 작업은 되돌릴 수 없습니다.'),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: _agreed,
+                onChanged: (v) => setState(() => _agreed = v ?? false),
+                activeColor: AppTheme.errorColor,
+              ),
+              const Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                    '위 내용을 모두 이해했으며 계정 삭제에 동의합니다.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: _agreed ? () => Navigator.pop(context, true) : null,
+          child: Text(
+            '삭제',
+            style: TextStyle(
+              color: _agreed ? AppTheme.errorColor : AppTheme.textSecondaryColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
