@@ -164,6 +164,21 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
+  // M8-1: 계정 삭제 (delete_my_account RPC → signOut)
+  Future<void> deleteAccount() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      try {
+        await Supabase.instance.client.rpc('delete_my_account');
+        await Supabase.instance.client.auth.signOut();
+      } on PostgrestException catch (e) {
+        throw Exception('계정 삭제 실패: ${e.message}');
+      } on SocketException {
+        throw Exception('네트워크 연결을 확인해 주세요');
+      }
+    });
+  }
+
   // 에러 초기화
   void clearError() {
     state = const AsyncValue.data(null);
