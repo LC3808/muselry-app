@@ -1251,16 +1251,6 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
     return result == true;
   }
 
-  // M8-2: 2차 최종 확인 모달 (체크박스 필수)
-  Future<bool> _showFinalConfirm(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _DeleteConfirmDialog(),
-    );
-    return result == true;
-  }
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1340,32 +1330,40 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                 style: TextStyle(color: AppTheme.errorColor),
               ),
               onTap: () async {
-                Navigator.pop(context); // 시트 닫기
+                // fix(M8): 시트를 닫기 전에 다이얼로그를 먼저 실행해야
+                // context가 유효한 상태에서 다이얼로그를 호출해야 함
+                // async gap 전 ScaffoldMessenger 미리 캡청 (use_build_context_synchronously 해소)
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+
+                // 시트 닫기 전 1차 모달
                 final first = await _showFirstWarning(context);
                 if (!first) return;
-                if (!context.mounted) return;
-                final final_ = await _showFinalConfirm(context);
-                if (!final_) return;
-                if (!context.mounted) return;
+                if (!mounted) return;
+                // 1차 모달 통과 후 2차 모달
+                // 두 번째 async gap 전 context 기반 호출을 피하기 위해
+                // _showFinalConfirm에 context 대신 navigator를 사용
+                final final_ = await showDialog<bool>(
+                  context: navigator.context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const _DeleteConfirmDialog(),
+                );
+                if (final_ != true) return;
+                // 모달 확인 후 시트 닫기
+                navigator.pop();
 
                 // RPC 호출 + signOut
                 try {
                   await ref.read(authNotifierProvider.notifier).deleteAccount();
                   // 라우터가 signedOut 이벤트를 감지하여 /login으로 자동 리다이렉트
-                  // 스낵바 표시를 위해 context가 아직 유효한 경우만 시도
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('계정이 삭제되었습니다.')),
-                    );
-                  }
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('계정이 삭제되었습니다.')),
+                  );
                 } catch (e) {
-                  if (!context.mounted) return;
                   final msg = e.toString().contains('네트워크')
                       ? '네트워크 연결을 확인해 주세요'
                       : '계정 삭제 중 오류가 발생했습니다. 문의를 통해 알려주세요';
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(msg)),
-                  );
+                  messenger.showSnackBar(SnackBar(content: Text(msg)));
                 }
               },
             ),
