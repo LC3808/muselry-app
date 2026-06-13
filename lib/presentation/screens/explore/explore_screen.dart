@@ -590,7 +590,7 @@ class _RegionFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 32, // M9.2-2: ChoiceChip 기본 높이와 동일 (44 → 32px)
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -602,10 +602,10 @@ class _RegionFilterBar extends StatelessWidget {
           return GestureDetector(
             onTap: () => onRegionSelected(region),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 52), // M9.1-1: 알약 형태 보장
+              constraints: const BoxConstraints(minWidth: 52, minHeight: 32, maxHeight: 32), // M9.2-2: 높이 고정
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0), // M9.1-1: horizontal 확대
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0), // M9.1-1 horizontal 유지
                 decoration: BoxDecoration(
                   color: isSelected
                       ? const Color(0xFF2C3E50)
