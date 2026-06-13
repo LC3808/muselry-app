@@ -188,7 +188,7 @@ class CultureLevel {
       case 3: return 11;
       case 4: return 21;
       case 5: return 36;
-      case 6: return 57;
+      case 6: return 61; // M9.1-2: 61~
       default: return 1;
     }
   }
@@ -241,13 +241,13 @@ CultureLevel computeCultureLevel(int distinctCount) {
       progressLabel: '다음 레벨까지 ${36 - distinctCount}곳',
     );
   }
-  if (distinctCount <= 56) {
+  if (distinctCount <= 60) { // M9.1-2: 36~60
     return CultureLevel(
       level: 5,
       title: 'Lv.5 문화 큐레이터',
       currentCount: distinctCount,
-      nextThreshold: 57,
-      progressLabel: '다음 레벨까지 ${57 - distinctCount}곳',
+      nextThreshold: 61,
+      progressLabel: '다음 레벨까지 ${61 - distinctCount}곳',
     );
   }
   return CultureLevel(
