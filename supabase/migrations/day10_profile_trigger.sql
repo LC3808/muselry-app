@@ -10,6 +10,10 @@
 --
 -- 멱등성: CREATE OR REPLACE + DROP TRIGGER IF EXISTS 구조로
 --         중복 실행해도 안전합니다.
+--
+-- [2026-06-15 수정] 이메일 가입 시 nickname 소스 누락 수정:
+--   SPLIT_PART(email,'@',1) 추가, email 컬럼 포함
+--   최신 확정 버전은 hotfix_email_signup_trigger.sql 참조
 -- ============================================================
 
 -- 1) 트리거 함수 생성/교체
@@ -20,15 +24,17 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, nickname, avatar_url)
+  INSERT INTO public.profiles (id, nickname, email, avatar_url)
   VALUES (
     NEW.id,
     COALESCE(
-      NEW.raw_user_meta_data->>'nickname',
-      NEW.raw_user_meta_data->>'name',
-      NEW.raw_user_meta_data->>'full_name',
-      SPLIT_PART(NEW.email, '@', 1)
+      NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+      NULLIF(TRIM(NEW.raw_user_meta_data->>'name'), ''),
+      NULLIF(TRIM(NEW.raw_user_meta_data->>'nickname'), ''),
+      NULLIF(TRIM(SPLIT_PART(NEW.email, '@', 1)), ''),
+      'user_' || SUBSTR(NEW.id::text, 1, 8)
     ),
+    NEW.email,
     NEW.raw_user_meta_data->>'avatar_url'
   )
   ON CONFLICT (id) DO NOTHING;
