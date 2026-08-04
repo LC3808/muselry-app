@@ -1,0 +1,123 @@
+import 'dart:async';
+import 'dart:developer' as dev;
+import 'dart:math' as math;
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+import 'package:xml/xml.dart';
+
+import 'exhibition_model.dart';
+
+/// 한국문화정보원 문화정보 OpenAPI period2 클라이언트
+/// - 실시간 호출만 사용 (Supabase/로컬 DB 저장 금지)
+/// - 동일 sido 결과는 6시간 메모리 캐시
+/// - realmName == '전시' 필터는 클라이언트에서 수행
+class ExhibitionApi {
+  ExhibitionApi._();
+  static final ExhibitionApi instance = ExhibitionApi._();
+
+  static const _endpoint =
+      'https://apis.data.go.kr/B553457/cultureinfo/period2';
+  static const _cacheDuration = Duration(hours: 6);
+
+  // 메모리 캐시: sido → (timestamp, list)
+  final Map<String, _CacheEntry> _cache = {};
+
+  /// sido 기준 현재 진행 중인 전시 목록 반환 (최대 numOfRows개 중 '전시' 필터 후)
+  /// 실패 시 null 반환 (섹션 숨김 처리는 호출자 담당)
+  Future<List<Exhibition>?> fetchExhibitions(String sido) async {
+    // 캐시 확인
+    final cached = _cache[sido];
+    if (cached != null &&
+        DateTime.now().difference(cached.timestamp) < _cacheDuration) {
+      dev.log('[ExhibitionApi] cache hit: $sido', name: 'Exhibition');
+      return cached.items;
+    }
+
+    final serviceKey = dotenv.env['CULTURE_API_KEY'] ?? '';
+    if (serviceKey.isEmpty) {
+      dev.log('[ExhibitionApi] CULTURE_API_KEY not set', name: 'Exhibition');
+      return cached?.items; // 기존 캐시 있으면 반환
+    }
+
+    final now = DateTime.now();
+    final from =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final to90 = now.add(const Duration(days: 90));
+    final to =
+        '${to90.year}${to90.month.toString().padLeft(2, '0')}${to90.day.toString().padLeft(2, '0')}';
+
+    final uri = Uri.parse(_endpoint).replace(queryParameters: {
+      'serviceKey': serviceKey,
+      'from': from,
+      'to': to,
+      'sido': sido,
+      'numOfRows': '100',
+      'pageNo': '1',
+    });
+
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        dev.log('[ExhibitionApi] HTTP ${response.statusCode}',
+            name: 'Exhibition');
+        return cached?.items;
+      }
+
+      final document = XmlDocument.parse(response.body);
+      final items = document.findAllElements('item');
+
+      final exhibitions = items
+          .map((item) {
+            try {
+              return Exhibition.fromXmlItem(item);
+            } catch (e) {
+              dev.log('[ExhibitionApi] parse error: $e', name: 'Exhibition');
+              return null;
+            }
+          })
+          .whereType<Exhibition>()
+          // §5: realmName == '전시' 클라이언트 필터
+          .where((e) => e.realmName == '전시')
+          .toList();
+
+      _cache[sido] = _CacheEntry(
+        timestamp: DateTime.now(),
+        items: exhibitions,
+      );
+
+      dev.log(
+          '[ExhibitionApi] fetched ${exhibitions.length} exhibitions for $sido',
+          name: 'Exhibition');
+      return exhibitions;
+    } on TimeoutException {
+      dev.log('[ExhibitionApi] timeout', name: 'Exhibition');
+      return cached?.items;
+    } catch (e) {
+      dev.log('[ExhibitionApi] error: $e', name: 'Exhibition');
+      return cached?.items;
+    }
+  }
+
+  /// 두 좌표 간 거리 계산 (km, Haversine)
+  static double distanceKm(
+      double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371.0;
+    final dLat = _rad(lat2 - lat1);
+    final dLon = _rad(lon2 - lon1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_rad(lat1)) *
+            math.cos(_rad(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  static double _rad(double deg) => deg * math.pi / 180;
+}
+
+class _CacheEntry {
+  final DateTime timestamp;
+  final List<Exhibition> items;
+  const _CacheEntry({required this.timestamp, required this.items});
+}

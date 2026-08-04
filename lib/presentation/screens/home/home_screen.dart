@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/museum.dart';
 import '../../providers/museum_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../../features/exhibition/widgets/exhibition_section.dart';
 
 /// 홈 화면 (Day 9 업데이트)
 /// - 인기 장소 가로 스크롤 섹션 추가 (museum_ranking 기준, 폴백: average_rating)
@@ -92,6 +93,9 @@ class HomeScreen extends ConsumerWidget {
                     );
                   },
                 ),
+                const SizedBox(height: 32),
+                // ── 내 주변 전시 섹션 (v0.4.0: 문화정보 OpenAPI 실시간) ────────
+                const ExhibitionSection(),
                 const SizedBox(height: 16),
               ],
             ),
