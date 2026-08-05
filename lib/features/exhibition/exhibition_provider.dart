@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,12 +90,14 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
   }
 
   Future<ExhibitionState> _load() async {
+    print('EXH: _load start');
     double? userLat;
     double? userLng;
     bool hasLocation = false;
     String sido = '서울'; // 기본값: 서울
 
     // §7: 위치 권한 확인 및 좌표 획득
+    // 위치 획득에 실패해도 서울 기준 API 호출은 반드시 진행
     try {
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
@@ -102,11 +105,14 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
       }
       if (perm != LocationPermission.deniedForever &&
           perm != LocationPermission.denied) {
+        // 위치 획득 timeout: Future.timeout으로 독립 제어 (일부 Android에서 timeLimit 무시 방지)
         final pos = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.low, // 전력 절약
-            timeLimit: Duration(seconds: 8),
           ),
+        ).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => throw TimeoutException('location timeout'),
         );
         // §13: GPS 좌표는 저장하지 않고 sido 변환에만 사용
         userLat = pos.latitude;
@@ -115,16 +121,24 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
         sido = latLngToSido(pos.latitude, pos.longitude);
         dev.log('[ExhibitionProvider] sido=$sido', name: 'Exhibition');
       }
+    } on TimeoutException {
+      print('EXH: location timeout — fallback to 서울');
+      dev.log('[ExhibitionProvider] location timeout', name: 'Exhibition');
     } catch (e) {
+      print('EXH: location error=$e — fallback to 서울');
       dev.log('[ExhibitionProvider] location error: $e', name: 'Exhibition');
       // 위치 실패 → 서울 기준 날짜순
     }
 
+    print('EXH: sido=$sido hasLocation=$hasLocation');
+
     // API 호출 (§8: 캐시 포함)
     final result = await ExhibitionApi.instance.fetchExhibitions(sido);
+    print('EXH: api returned ${result?.length ?? "null"}');
 
     if (result == null) {
       // API 실패 + 캐시 없음 → 섹션 숨김 (빈 리스트)
+      print('EXH: result null — section hidden');
       return ExhibitionState(
         items: const [],
         isLoading: false,
@@ -163,6 +177,7 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
 
     // 최대 10개
     final limited = sorted.take(10).toList();
+    print('EXH: final items=${limited.length}');
 
     return ExhibitionState(
       items: limited,

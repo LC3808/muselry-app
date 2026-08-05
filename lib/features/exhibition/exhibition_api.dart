@@ -37,7 +37,8 @@ class ExhibitionApi {
     final serviceKey = dotenv.env['CULTURE_API_KEY'] ?? '';
     if (serviceKey.isEmpty) {
       dev.log('[ExhibitionApi] CULTURE_API_KEY not set', name: 'Exhibition');
-      return cached?.items; // 기존 캐시 있으면 반환
+      print('EXH-API: CULTURE_API_KEY not set — returning null');
+      return null; // 키 없으면 null 반환 → 섹션 숨김
     }
 
     final now = DateTime.now();
@@ -52,12 +53,18 @@ class ExhibitionApi {
       'from': from,
       'to': to,
       'sido': sido,
-      'numOfRows': '100',
+      'numOfRows': '100', // §5-1: numOfRows 대소문자 확인
       'pageNo': '1',
     });
 
+    print('EXH-API: fetching sido=$sido from=$from to=$to');
+
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      print('EXH-API: status=${response.statusCode}');
+      print(
+          'EXH-API: body head=${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
+
       if (response.statusCode != 200) {
         dev.log('[ExhibitionApi] HTTP ${response.statusCode}',
             name: 'Exhibition');
@@ -66,20 +73,32 @@ class ExhibitionApi {
 
       final document = XmlDocument.parse(response.body);
       final items = document.findAllElements('item');
+      final itemList = items.toList();
+      print('EXH-API: raw items=${itemList.length}');
 
-      final exhibitions = items
+      // realmName 샘플 출력 (진단용)
+      for (final item in itemList.take(5)) {
+        final realm = item.getElement('realmName')?.innerText;
+        final title = item.getElement('title')?.innerText;
+        print('EXH-API: sample realm=[$realm] title=[$title]');
+      }
+
+      final exhibitions = itemList
           .map((item) {
             try {
               return Exhibition.fromXmlItem(item);
             } catch (e) {
               dev.log('[ExhibitionApi] parse error: $e', name: 'Exhibition');
+              print('EXH-API: parse error=$e');
               return null;
             }
           })
           .whereType<Exhibition>()
-          // §5: realmName == '전시' 클라이언트 필터
-          .where((e) => e.realmName == '전시')
+          // §5: realmName == '전시' 클라이언트 필터 (trim 포함)
+          .where((e) => e.realmName.trim() == '전시')
           .toList();
+
+      print('EXH-API: after 전시 filter=${exhibitions.length}');
 
       _cache[sido] = _CacheEntry(
         timestamp: DateTime.now(),
@@ -92,9 +111,11 @@ class ExhibitionApi {
       return exhibitions;
     } on TimeoutException {
       dev.log('[ExhibitionApi] timeout', name: 'Exhibition');
+      print('EXH-API: timeout');
       return cached?.items;
     } catch (e) {
       dev.log('[ExhibitionApi] error: $e', name: 'Exhibition');
+      print('EXH-API: error=$e');
       return cached?.items;
     }
   }
