@@ -151,22 +151,46 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
 
     List<Exhibition> sorted;
     if (hasLocation && userLat != null && userLng != null) {
-      // 위치 허용: 거리순 정렬
+      // 위치 허용: 거리 계산 후 거리순 정렬
       final lat = userLat;
       final lng = userLng;
+
+      // 좌표 있는 항목에 거리 부착 후 정렬
       final withDist = result
           .where((e) => e.latitude != null && e.longitude != null)
+          .map((e) => (
+                item: e,
+                dist: ExhibitionApi.distanceKm(
+                    lat, lng, e.latitude!, e.longitude!),
+              ))
           .toList()
-        ..sort((a, b) {
-          final da = ExhibitionApi.distanceKm(
-              lat, lng, a.latitude!, a.longitude!);
-          final db = ExhibitionApi.distanceKm(
-              lat, lng, b.latitude!, b.longitude!);
-          return da.compareTo(db);
-        });
-      // 좌표 없는 항목은 뒤에 추가
-      final withoutDist = result.where((e) => e.latitude == null).toList();
-      sorted = [...withDist, ...withoutDist];
+        ..sort((a, b) => a.dist.compareTo(b.dist));
+
+      // 거리 필터: 80km 이내 우선, 0건이면 150km로 확장, 그래도 0건이면 섹션 숨김
+      const double primaryRadiusKm = 80.0;
+      const double fallbackRadiusKm = 150.0;
+
+      var filtered = withDist.where((e) => e.dist <= primaryRadiusKm).toList();
+      if (filtered.isEmpty) {
+        filtered = withDist.where((e) => e.dist <= fallbackRadiusKm).toList();
+        if (kDebugMode) {
+          print('EXH: 80km 0건 — 150km로 확장: ${filtered.length}건');
+        }
+      }
+      if (filtered.isEmpty) {
+        // 좌표 있는 항목이 모두 원거리 → 섹션 숨김
+        if (kDebugMode) print('EXH: 거리 필터 후 0건 — section hidden');
+        return ExhibitionState(
+          items: const [],
+          isLoading: false,
+          hasLocation: hasLocation,
+          userLat: userLat,
+          userLng: userLng,
+        );
+      }
+
+      // 좌표 없는 항목은 거리 필터에서 제외 (표시 안 함)
+      sorted = filtered.map((e) => e.item).toList();
     } else {
       // 위치 거부/실패: endDate 임박순 → startDate 빠른 순
       sorted = List.from(result)

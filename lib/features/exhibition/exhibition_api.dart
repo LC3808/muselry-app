@@ -101,7 +101,16 @@ class ExhibitionApi {
           }
           final realm = nodeText('realmName');
           final title = nodeText('title');
+          // 링크 필드 확인 (어떤 필드명으로 제공되는지 실기기 로그로 확인)
+          final url = nodeText('url');
+          final homepage = nodeText('homepage');
+          final detailUrl = nodeText('detailUrl');
+          final referenceUrl = nodeText('referenceUrl');
+          final link = nodeText('link');
           print('EXH-API: sample realm=[$realm] title=[$title]');
+          if (kDebugMode) {
+            print('EXH-API: link fields url=[$url] homepage=[$homepage] detailUrl=[$detailUrl] referenceUrl=[$referenceUrl] link=[$link]');
+          }
         }
       }
 

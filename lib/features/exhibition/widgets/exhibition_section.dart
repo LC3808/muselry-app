@@ -36,10 +36,8 @@ class _ExhibitionContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 섹션 헤더
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+        // 섹션 헤더 (외부 padding 없음 — home_screen.dart EdgeInsets.all(20)에 정렬)
+        Row(
             children: [
               const Text(
                 '내 주변 전시',
@@ -68,15 +66,14 @@ class _ExhibitionContent extends StatelessWidget {
                   ),
                 ),
             ],
-          ),
         ),
         const SizedBox(height: 12),
-        // 가로 스크롤 카드 리스트
+        // 가로 스크롤 카드 리스트 (외부 padding 없음 — home_screen.dart EdgeInsets.all(20)에 정렬)
         SizedBox(
           height: 200,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.zero,
             itemCount: state.items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
