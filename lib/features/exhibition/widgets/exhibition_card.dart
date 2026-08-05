@@ -41,6 +41,8 @@ class ExhibitionCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 160,
+        // 분야 배지 + 제목(2줄) + 장소 + 기간 + 여백을 수용하는 높이
+        // 이미지 100 + 패딩 8*2 + 배지 16 + 간격 4 + 제목 2줄 약 32 + 간격 4 + 장소 14 + 간격 2 + 기간 12 + 여백 = 228
         decoration: BoxDecoration(
           color: AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(12),
@@ -54,8 +56,9 @@ class ExhibitionCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // 내용에 맞게 최소 높이 사용
           children: [
-            // 썸네일
+            // 썸네일 (고정 높이 100)
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(12)),
@@ -87,26 +90,30 @@ class ExhibitionCard extends StatelessWidget {
                 ],
               ),
             ),
-            // 정보
+            // 정보 영역 (패딩 8)
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 분야 배지 (realmName pill)
+                  // 분야 배지 (1줄, 고정)
                   _RealmBadge(realm: exhibition.realmName),
                   const SizedBox(height: 4),
+                  // 제목 (최대 2줄)
                   Text(
                     exhibition.title,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textPrimaryColor,
+                      height: 1.3,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
+                  // 장소 (최대 1줄)
                   Text(
                     exhibition.place,
                     style: const TextStyle(
@@ -117,6 +124,7 @@ class ExhibitionCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
+                  // 기간 (최대 1줄, 연도 포함 형식 유지)
                   Text(
                     exhibition.displayPeriod,
                     style: TextStyle(
@@ -161,6 +169,8 @@ class _RealmBadge extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: textColor,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

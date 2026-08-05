@@ -69,8 +69,9 @@ class _ExhibitionContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         // 가로 스크롤 카드 리스트 (외부 padding 없음 — home_screen.dart EdgeInsets.all(20)에 정렬)
+        // 카드 높이: 이미지 100 + 패딩 16 + 배지 16 + 제목 32 + 장소 14 + 기간 12 + 여백 = 228
         SizedBox(
-          height: 200,
+          height: 228,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
