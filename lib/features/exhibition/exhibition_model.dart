@@ -74,14 +74,17 @@ class Exhibition {
   }
 
   /// 화면 표시용 날짜 포맷 변환 (원본 필드 수정 없음)
-  /// 20260804 → 8.4
+  /// 20260804 → 2026.8.4
   static String formatDate(String yyyymmdd) {
     if (yyyymmdd.length != 8) return yyyymmdd;
+    final year = int.tryParse(yyyymmdd.substring(0, 4)) ?? 0;
     final month = int.tryParse(yyyymmdd.substring(4, 6)) ?? 0;
     final day = int.tryParse(yyyymmdd.substring(6, 8)) ?? 0;
-    return '$month.$day';
+    if (year == 0 || month == 0 || day == 0) return yyyymmdd;
+    return '$year.$month.$day';
   }
 
+  /// 전시 기간 표시: 2025.10.1 – 2026.8.30
   String get displayPeriod =>
       '${formatDate(startDate)} – ${formatDate(endDate)}';
 }

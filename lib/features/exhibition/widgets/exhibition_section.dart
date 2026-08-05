@@ -183,7 +183,7 @@ class _ExhibitionDetailSheet extends StatelessWidget {
                   const SizedBox(height: 8),
                   _InfoRow(
                     icon: Icons.calendar_today_outlined,
-                    text: '${exhibition.displayPeriod} (${exhibition.startDate.substring(0, 4)})',
+                    text: '전시 기간: ${exhibition.displayPeriod}',
                   ),
                   if (exhibition.area != null || exhibition.sigungu != null) ...[
                     const SizedBox(height: 8),

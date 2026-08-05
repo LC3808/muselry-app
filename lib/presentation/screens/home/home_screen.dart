@@ -431,10 +431,10 @@ class _QuickAccessGrid extends ConsumerWidget {
       mainAxisSpacing: 12,
       childAspectRatio: 1.6,
       children: [
-        // M7-G-5-1: 하늘색 파스텔 카드 (전시 공간 탐색)
+        // M7-G-5-1: 하늘색 파스텔 카드 (공간 탐색)
         _QuickAccessCard(
           emoji: '🔍',
-          label: '전시 공간 탐색',
+          label: '공간 탐색',
           color: const Color(0xFF3498DB),
           onTap: () => context.go(AppRoutes.explore),
         ),
