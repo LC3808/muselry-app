@@ -128,17 +128,16 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
     } catch (e) {
       if (kDebugMode) print('EXH: location error=$e — fallback to 서울');
       dev.log('[ExhibitionProvider] location error: $e', name: 'Exhibition');
-      // 위치 실패 → 서울 기준 날짜순
     }
 
     if (kDebugMode) print('EXH: sido=$sido hasLocation=$hasLocation');
 
-    // API 호출 (§8: 캐시 포함)
-    final result = await ExhibitionApi.instance.fetchExhibitions(sido);
+    // ── 1단계: pageNo 1~3 호출 ──────────────────────────────────────────────
+    List<Exhibition>? result =
+        await ExhibitionApi.instance.fetchExhibitions(sido);
     if (kDebugMode) print('EXH: api returned ${result?.length ?? "null"}');
 
     if (result == null) {
-      // API 실패 + 캐시 없음 → 섹션 숨김 (빈 리스트)
       if (kDebugMode) print('EXH: result null — section hidden');
       return ExhibitionState(
         items: const [],
@@ -149,14 +148,16 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
       );
     }
 
-    List<Exhibition> sorted;
-    if (hasLocation && userLat != null && userLng != null) {
-      // 위치 허용: 거리 계산 후 거리순 정렬
-      final lat = userLat;
-      final lng = userLng;
+    // ── 거리 필터 helper ────────────────────────────────────────────────────
+    List<Exhibition> applyDistanceFilter(
+      List<Exhibition> source,
+      double lat,
+      double lng,
+    ) {
+      const double primaryRadiusKm = 80.0;
+      const double fallbackRadiusKm = 150.0;
 
-      // 좌표 있는 항목에 거리 부착 후 정렬
-      final withDist = result
+      final withDist = source
           .where((e) => e.latitude != null && e.longitude != null)
           .map((e) => (
                 item: e,
@@ -166,19 +167,46 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
           .toList()
         ..sort((a, b) => a.dist.compareTo(b.dist));
 
-      // 거리 필터: 80km 이내 우선, 0건이면 150km로 확장, 그래도 0건이면 섹션 숨김
-      const double primaryRadiusKm = 80.0;
-      const double fallbackRadiusKm = 150.0;
+      var filtered =
+          withDist.where((e) => e.dist <= primaryRadiusKm).toList();
+      if (kDebugMode) print('EXH: within 80km=${filtered.length}');
 
-      var filtered = withDist.where((e) => e.dist <= primaryRadiusKm).toList();
       if (filtered.isEmpty) {
-        filtered = withDist.where((e) => e.dist <= fallbackRadiusKm).toList();
+        filtered =
+            withDist.where((e) => e.dist <= fallbackRadiusKm).toList();
+        if (kDebugMode) print('EXH: within 150km=${filtered.length}');
+      }
+
+      return filtered.map((e) => e.item).toList();
+    }
+
+    // ── 정렬 및 거리 필터 적용 ───────────────────────────────────────────────
+    List<Exhibition> sorted;
+    if (hasLocation && userLat != null && userLng != null) {
+      final lat = userLat;
+      final lng = userLng;
+
+      sorted = applyDistanceFilter(result, lat, lng);
+
+      // ── 2단계: 거리 필터 후 6건 미만이면 pageNo 4~5 추가 호출 ──────────────
+      if (sorted.length < 6) {
         if (kDebugMode) {
-          print('EXH: 80km 0건 — 150km로 확장: ${filtered.length}건');
+          print(
+              'EXH: 거리 필터 후 ${sorted.length}건 < 6 — pages 4-5 추가 호출');
+        }
+
+        final expanded =
+            await ExhibitionApi.instance.fetchExhibitionsExtra(sido, result);
+
+        if (expanded != null) {
+          if (kDebugMode) {
+            print('EXH: api returned (expanded) ${expanded.length}');
+          }
+          sorted = applyDistanceFilter(expanded, lat, lng);
         }
       }
-      if (filtered.isEmpty) {
-        // 좌표 있는 항목이 모두 원거리 → 섹션 숨김
+
+      if (sorted.isEmpty) {
         if (kDebugMode) print('EXH: 거리 필터 후 0건 — section hidden');
         return ExhibitionState(
           items: const [],
@@ -188,9 +216,6 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
           userLng: userLng,
         );
       }
-
-      // 좌표 없는 항목은 거리 필터에서 제외 (표시 안 함)
-      sorted = filtered.map((e) => e.item).toList();
     } else {
       // 위치 거부/실패: endDate 임박순 → startDate 빠른 순
       sorted = List.from(result)
