@@ -12,6 +12,7 @@ import 'exhibition_model.dart';
 
 /// GPS 좌표를 문화정보 API sido 파라미터로 변환
 /// 좌표 범위 매핑 방식 (역지오코딩 라이브러리 불필요)
+/// 참고: sido 파라미터는 서버 필터로 신뢰 불가 — 앱 내부 거리 필터로 처리
 String latLngToSido(double lat, double lng) {
   // 제주
   if (lat >= 33.0 && lat <= 34.0 && lng >= 126.0 && lng <= 127.0) return '제주';
@@ -51,7 +52,7 @@ String latLngToSido(double lat, double lng) {
   return '서울';
 }
 
-// ── 위치 + 전시 목록 상태 ────────────────────────────────────────────────────
+// ── 위치 + 문화행사 목록 상태 ─────────────────────────────────────────────────
 
 class ExhibitionState {
   final List<Exhibition> items;
@@ -97,7 +98,7 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
     bool hasLocation = false;
     String sido = '서울'; // 기본값: 서울
 
-    // §7: 위치 권한 확인 및 좌표 획득
+    // 위치 권한 확인 및 좌표 획득
     // 위치 획득에 실패해도 서울 기준 API 호출은 반드시 진행
     try {
       LocationPermission perm = await Geolocator.checkPermission();
@@ -106,16 +107,15 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
       }
       if (perm != LocationPermission.deniedForever &&
           perm != LocationPermission.denied) {
-        // 위치 획득 timeout: Future.timeout으로 독립 제어 (일부 Android에서 timeLimit 무시 방지)
+        // Future.timeout으로 독립 제어 (일부 Android에서 timeLimit 무시 방지)
         final pos = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low, // 전력 절약
+            accuracy: LocationAccuracy.low,
           ),
         ).timeout(
           const Duration(seconds: 5),
           onTimeout: () => throw TimeoutException('location timeout'),
         );
-        // §13: GPS 좌표는 저장하지 않고 sido 변환에만 사용
         userLat = pos.latitude;
         userLng = pos.longitude;
         hasLocation = true;
@@ -132,9 +132,8 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
 
     if (kDebugMode) print('EXH: sido=$sido hasLocation=$hasLocation');
 
-    // ── 1단계: pageNo 1~3 호출 ──────────────────────────────────────────────
-    List<Exhibition>? result =
-        await ExhibitionApi.instance.fetchExhibitions(sido);
+    // API 호출: numOfrows=100 단일 호출
+    final result = await ExhibitionApi.instance.fetchExhibitions(sido);
     if (kDebugMode) print('EXH: api returned ${result?.length ?? "null"}');
 
     if (result == null) {
@@ -148,16 +147,16 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
       );
     }
 
-    // ── 거리 필터 helper ────────────────────────────────────────────────────
-    List<Exhibition> applyDistanceFilter(
-      List<Exhibition> source,
-      double lat,
-      double lng,
-    ) {
+    // ── 거리 필터 ───────────────────────────────────────────────────────────
+    List<Exhibition> sorted;
+    if (hasLocation && userLat != null && userLng != null) {
+      final lat = userLat;
+      final lng = userLng;
+
       const double primaryRadiusKm = 80.0;
       const double fallbackRadiusKm = 150.0;
 
-      final withDist = source
+      final withDist = result
           .where((e) => e.latitude != null && e.longitude != null)
           .map((e) => (
                 item: e,
@@ -177,34 +176,7 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
         if (kDebugMode) print('EXH: within 150km=${filtered.length}');
       }
 
-      return filtered.map((e) => e.item).toList();
-    }
-
-    // ── 정렬 및 거리 필터 적용 ───────────────────────────────────────────────
-    List<Exhibition> sorted;
-    if (hasLocation && userLat != null && userLng != null) {
-      final lat = userLat;
-      final lng = userLng;
-
-      sorted = applyDistanceFilter(result, lat, lng);
-
-      // ── 2단계: 거리 필터 후 6건 미만이면 pageNo 4~5 추가 호출 ──────────────
-      if (sorted.length < 6) {
-        if (kDebugMode) {
-          print(
-              'EXH: 거리 필터 후 ${sorted.length}건 < 6 — pages 4-5 추가 호출');
-        }
-
-        final expanded =
-            await ExhibitionApi.instance.fetchExhibitionsExtra(sido, result);
-
-        if (expanded != null) {
-          if (kDebugMode) {
-            print('EXH: api returned (expanded) ${expanded.length}');
-          }
-          sorted = applyDistanceFilter(expanded, lat, lng);
-        }
-      }
+      sorted = filtered.map((e) => e.item).toList();
 
       if (sorted.isEmpty) {
         if (kDebugMode) print('EXH: 거리 필터 후 0건 — section hidden');
