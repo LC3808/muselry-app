@@ -239,7 +239,14 @@ class ExhibitionApi {
     return allItems;
   }
 
-  /// raw XmlElement 리스트 → 모델 변환 + 중복 seq 제거 + realmName='전시' 필터
+  /// 허용 realmName 목록 (문화행사 확장)
+  static const Set<String> allowedRealms = {
+    '전시',
+    '뮤지컬/오페라',
+    '연극',
+  };
+
+  /// raw XmlElement 리스트 → 모델 변환 + 중복 seq 제거 + allowedRealms 필터
   /// [excludeSeqs]: 이미 처리된 seq 집합 (추가 페이지 중복 방지용)
   List<Exhibition> deduplicateAndFilter(
     List<XmlElement> rawItems, {
@@ -247,6 +254,8 @@ class ExhibitionApi {
   }) {
     final seen = <String>{...?excludeSeqs};
     final result = <Exhibition>[];
+    // realm counts: 전체 파싱 데이터 기준 (allowedRealms 필터 전)
+    final realmCounts = <String, int>{};
 
     for (final item in rawItems) {
       Exhibition? ex;
@@ -261,12 +270,20 @@ class ExhibitionApi {
       if (seen.contains(ex.seq)) continue;
       seen.add(ex.seq);
 
-      if (ex.realmName.trim() != '전시') continue;
+      // realm counts 집계 (필터 전 전체 데이터 기준)
+      final realm = ex.realmName.trim();
+      if (realm.isNotEmpty) {
+        realmCounts[realm] = (realmCounts[realm] ?? 0) + 1;
+      }
+
+      // 허용 목록에 없거나 빈 realmName 노출 금지
+      if (realm.isEmpty || !allowedRealms.contains(realm)) continue;
 
       result.add(ex);
     }
 
     if (kDebugMode) {
+      print('EXH-API: realm counts=$realmCounts');
       for (final ex in result.take(5)) {
         print('EXH-API: mapped realm=[${ex.realmName}] title=[${ex.title}]');
       }

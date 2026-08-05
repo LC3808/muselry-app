@@ -6,7 +6,7 @@ import '../exhibition_model.dart';
 import '../exhibition_provider.dart';
 import 'exhibition_card.dart';
 
-/// 홈 화면 "내 주변 전시" 섹션
+/// 홈 화면 "내 주변 문화행사" 섹션
 /// - 비동기 독립 로딩 (홈 전체 렌더링 차단 없음)
 /// - 결과 0건 또는 API 실패 시 섹션 자체 숨김
 class ExhibitionSection extends ConsumerWidget {
@@ -40,7 +40,7 @@ class _ExhibitionContent extends StatelessWidget {
         Row(
             children: [
               const Text(
-                '내 주변 전시',
+                '내 주변 문화행사',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -101,7 +101,7 @@ class _ExhibitionContent extends StatelessWidget {
   }
 }
 
-/// 전시 상세 모달 (§10: title/place/기간/thumbnail/realmName/area/sigungu만)
+/// 문화행사 상세 모달 (§10: title/place/기간/thumbnail/realmName/area/sigungu만)
 /// 금지: museums 연결, 방문기록, 북마크
 class _ExhibitionDetailSheet extends StatelessWidget {
   final Exhibition exhibition;
@@ -183,7 +183,7 @@ class _ExhibitionDetailSheet extends StatelessWidget {
                   const SizedBox(height: 8),
                   _InfoRow(
                     icon: Icons.calendar_today_outlined,
-                    text: '전시 기간: ${exhibition.displayPeriod}',
+                    text: '행사 기간: ${exhibition.displayPeriod}',
                   ),
                   if (exhibition.area != null || exhibition.sigungu != null) ...[
                     const SizedBox(height: 8),

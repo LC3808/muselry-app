@@ -62,7 +62,7 @@ class ExhibitionCard extends StatelessWidget {
               child: Stack(
                 children: [
                   _Thumbnail(url: exhibition.thumbnail),
-                  // 거리 배지
+                  // 거리 배지 (위치 있을 때만)
                   if (distanceText != null)
                     Positioned(
                       top: 8,
@@ -93,6 +93,9 @@ class ExhibitionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 분야 배지 (realmName pill)
+                  _RealmBadge(realm: exhibition.realmName),
+                  const SizedBox(height: 4),
                   Text(
                     exhibition.title,
                     style: const TextStyle(
@@ -130,6 +133,62 @@ class ExhibitionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// realmName 분야 배지 (pill 형태)
+class _RealmBadge extends StatelessWidget {
+  final String realm;
+  const _RealmBadge({required this.realm});
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = realm.trim();
+    if (trimmed.isEmpty) return const SizedBox.shrink();
+
+    final (bgColor, textColor) = _realmColors(trimmed);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        trimmed,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+
+  /// realmName별 배지 색상 (뮤즐리 톤)
+  (Color, Color) _realmColors(String realm) {
+    switch (realm) {
+      case '전시':
+        return (
+          AppTheme.primaryColor.withValues(alpha: 0.12),
+          AppTheme.primaryColor,
+        );
+      case '뮤지컬/오페라':
+        return (
+          const Color(0xFF9B59B6).withValues(alpha: 0.12),
+          const Color(0xFF9B59B6),
+        );
+      case '연극':
+        return (
+          const Color(0xFFE67E22).withValues(alpha: 0.12),
+          const Color(0xFFE67E22),
+        );
+      default:
+        return (
+          AppTheme.dividerColor,
+          AppTheme.textSecondaryColor,
+        );
+    }
   }
 }
 
