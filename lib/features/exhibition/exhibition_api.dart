@@ -87,10 +87,20 @@ class ExhibitionApi {
       if (kDebugMode) print('EXH-API: raw items=${itemList.length}');
 
       // realmName 샘플 출력 (진단용)
+      // innerText 사용 금지 — XmlText.value 기반 helper 사용
       if (kDebugMode) {
         for (final item in itemList.take(5)) {
-          final realm = item.getElement('realmName')?.innerText;
-          final title = item.getElement('title')?.innerText;
+          String nodeText(String tag) {
+            final el = item.getElement(tag);
+            if (el == null) return '';
+            return el.children
+                .whereType<XmlText>()
+                .map((n) => n.value)
+                .join()
+                .trim();
+          }
+          final realm = nodeText('realmName');
+          final title = nodeText('title');
           print('EXH-API: sample realm=[$realm] title=[$title]');
         }
       }

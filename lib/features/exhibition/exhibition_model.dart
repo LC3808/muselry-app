@@ -1,3 +1,5 @@
+import 'package:xml/xml.dart';
+
 /// 문화정보 OpenAPI period2 응답 item 모델
 /// 원본 필드값은 수정하지 않음 (지시서 §4, §절대규칙 4)
 class Exhibition {
@@ -28,52 +30,46 @@ class Exhibition {
   });
 
   /// XML item 노드에서 파싱
-  factory Exhibition.fromXmlItem(dynamic item) {
-    String getText(String tag) {
-      try {
-        return item.findElements(tag).first.innerText.trim();
-      } catch (_) {
-        return '';
-      }
+  factory Exhibition.fromXmlItem(XmlElement item) {
+    // innerText 사용 금지 (xml ^6.5.0 이하에서 미지원)
+    // XmlText.value 기반 helper로 텍스트 추출
+    String text(String tag) {
+      final element = item.getElement(tag);
+      if (element == null) return '';
+      return element.children
+          .whereType<XmlText>()
+          .map((node) => node.value)
+          .join()
+          .trim();
     }
 
-    String? getNullable(String tag) {
-      try {
-        final v = item.findElements(tag).first.innerText.trim();
-        return v.isEmpty ? null : v;
-      } catch (_) {
-        return null;
-      }
+    String? nullable(String tag) {
+      final v = text(tag);
+      return v.isEmpty ? null : v;
     }
 
-    double? getDouble(String tag) {
-      try {
-        final v = item.findElements(tag).first.innerText.trim();
-        return v.isEmpty ? null : double.tryParse(v);
-      } catch (_) {
-        return null;
-      }
+    double? asDouble(String tag) {
+      final v = text(tag);
+      return v.isEmpty ? null : double.tryParse(v);
     }
 
-    // realmName: getElement 직접 추출 + trim (findElements 대신 getElement 사용)
-    // serviceName을 fallback으로 사용 (빈 문자열인 경우)
-    final realmRaw = item.getElement('realmName')?.innerText.trim() ?? '';
-    final realmName = realmRaw.isNotEmpty
-        ? realmRaw
-        : (item.getElement('serviceName')?.innerText.trim() ?? '');
+    // realmName: 직접 추출 + serviceName fallback
+    final realmRaw = text('realmName');
+    final serviceNameRaw = text('serviceName');
+    final realm = realmRaw.isNotEmpty ? realmRaw : serviceNameRaw;
 
     return Exhibition(
-      seq: getText('seq'),
-      title: getText('title'),
-      place: getText('place'),
-      startDate: getText('startDate'),
-      endDate: getText('endDate'),
-      realmName: realmName,
-      thumbnail: getNullable('thumbnail'),
-      longitude: getDouble('gpsX'),
-      latitude: getDouble('gpsY'),
-      area: getNullable('area'),
-      sigungu: getNullable('sigungu'),
+      seq: text('seq'),
+      title: text('title'),
+      place: text('place'),
+      startDate: text('startDate'),
+      endDate: text('endDate'),
+      realmName: realm,
+      thumbnail: nullable('thumbnail'),
+      longitude: asDouble('gpsX'),
+      latitude: asDouble('gpsY'),
+      area: nullable('area'),
+      sigungu: nullable('sigungu'),
     );
   }
 
