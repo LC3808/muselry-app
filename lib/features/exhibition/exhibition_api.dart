@@ -95,18 +95,25 @@ class ExhibitionApi {
         }
       }
 
-      final exhibitions = itemList
-          .map((item) {
-            try {
-              return Exhibition.fromXmlItem(item);
-            } catch (e) {
-              dev.log('[ExhibitionApi] parse error: $e', name: 'Exhibition');
-              if (kDebugMode) print('EXH-API: parse error=$e');
-              return null;
-            }
-          })
-          .whereType<Exhibition>()
-          // §5: realmName == '전시' 클라이언트 필터 (trim 포함)
+      final mapped = itemList.map((item) {
+        try {
+          return Exhibition.fromXmlItem(item);
+        } catch (e) {
+          dev.log('[ExhibitionApi] parse error: $e', name: 'Exhibition');
+          if (kDebugMode) print('EXH-API: parse error=$e');
+          return null;
+        }
+      }).whereType<Exhibition>().toList();
+
+      // mapped realm 로그 (모델 변환 후 realmName 확인)
+      if (kDebugMode) {
+        for (final ex in mapped.take(5)) {
+          print('EXH-API: mapped realm=[${ex.realmName}] title=[${ex.title}]');
+        }
+      }
+
+      // §5: realmName == '전시' 클라이언트 필터 (trim 포함)
+      final exhibitions = mapped
           .where((e) => e.realmName.trim() == '전시')
           .toList();
 

@@ -55,13 +55,20 @@ class Exhibition {
       }
     }
 
+    // realmName: getElement 직접 추출 + trim (findElements 대신 getElement 사용)
+    // serviceName을 fallback으로 사용 (빈 문자열인 경우)
+    final realmRaw = item.getElement('realmName')?.innerText.trim() ?? '';
+    final realmName = realmRaw.isNotEmpty
+        ? realmRaw
+        : (item.getElement('serviceName')?.innerText.trim() ?? '');
+
     return Exhibition(
       seq: getText('seq'),
       title: getText('title'),
       place: getText('place'),
       startDate: getText('startDate'),
       endDate: getText('endDate'),
-      realmName: getText('realmName'),
+      realmName: realmName,
       thumbnail: getNullable('thumbnail'),
       longitude: getDouble('gpsX'),
       latitude: getDouble('gpsY'),
