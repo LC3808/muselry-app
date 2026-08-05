@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
@@ -37,7 +39,7 @@ class ExhibitionApi {
     final serviceKey = dotenv.env['CULTURE_API_KEY'] ?? '';
     if (serviceKey.isEmpty) {
       dev.log('[ExhibitionApi] CULTURE_API_KEY not set', name: 'Exhibition');
-      print('EXH-API: CULTURE_API_KEY not set — returning null');
+      if (kDebugMode) print('EXH-API: CULTURE_API_KEY not set — returning null');
       return null; // 키 없으면 null 반환 → 섹션 숨김
     }
 
@@ -57,13 +59,21 @@ class ExhibitionApi {
       'pageNo': '1',
     });
 
-    print('EXH-API: fetching sido=$sido from=$from to=$to');
+    if (kDebugMode) print('EXH-API: fetching sido=$sido from=$from to=$to');
 
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
-      print('EXH-API: status=${response.statusCode}');
-      print(
-          'EXH-API: body head=${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
+
+      // 원인 확정: response.body 사용 금지
+      // Dart http의 response.body는 latin-1 기본 디코딩 → UTF-8 한글 mojibake 발생
+      // response.bodyBytes를 utf8.decode()로 명시 디코딩해야 함
+      final decodedBody = utf8.decode(response.bodyBytes);
+
+      if (kDebugMode) {
+        print('EXH-API: status=${response.statusCode}');
+        print(
+            'EXH-API: body head=${decodedBody.substring(0, decodedBody.length > 300 ? 300 : decodedBody.length)}');
+      }
 
       if (response.statusCode != 200) {
         dev.log('[ExhibitionApi] HTTP ${response.statusCode}',
@@ -71,16 +81,18 @@ class ExhibitionApi {
         return cached?.items;
       }
 
-      final document = XmlDocument.parse(response.body);
+      final document = XmlDocument.parse(decodedBody);
       final items = document.findAllElements('item');
       final itemList = items.toList();
-      print('EXH-API: raw items=${itemList.length}');
+      if (kDebugMode) print('EXH-API: raw items=${itemList.length}');
 
       // realmName 샘플 출력 (진단용)
-      for (final item in itemList.take(5)) {
-        final realm = item.getElement('realmName')?.innerText;
-        final title = item.getElement('title')?.innerText;
-        print('EXH-API: sample realm=[$realm] title=[$title]');
+      if (kDebugMode) {
+        for (final item in itemList.take(5)) {
+          final realm = item.getElement('realmName')?.innerText;
+          final title = item.getElement('title')?.innerText;
+          print('EXH-API: sample realm=[$realm] title=[$title]');
+        }
       }
 
       final exhibitions = itemList
@@ -89,7 +101,7 @@ class ExhibitionApi {
               return Exhibition.fromXmlItem(item);
             } catch (e) {
               dev.log('[ExhibitionApi] parse error: $e', name: 'Exhibition');
-              print('EXH-API: parse error=$e');
+              if (kDebugMode) print('EXH-API: parse error=$e');
               return null;
             }
           })
@@ -98,7 +110,7 @@ class ExhibitionApi {
           .where((e) => e.realmName.trim() == '전시')
           .toList();
 
-      print('EXH-API: after 전시 filter=${exhibitions.length}');
+      if (kDebugMode) print('EXH-API: after 전시 filter=${exhibitions.length}');
 
       _cache[sido] = _CacheEntry(
         timestamp: DateTime.now(),
@@ -111,11 +123,11 @@ class ExhibitionApi {
       return exhibitions;
     } on TimeoutException {
       dev.log('[ExhibitionApi] timeout', name: 'Exhibition');
-      print('EXH-API: timeout');
+      if (kDebugMode) print('EXH-API: timeout');
       return cached?.items;
     } catch (e) {
       dev.log('[ExhibitionApi] error: $e', name: 'Exhibition');
-      print('EXH-API: error=$e');
+      if (kDebugMode) print('EXH-API: error=$e');
       return cached?.items;
     }
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -90,7 +91,7 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
   }
 
   Future<ExhibitionState> _load() async {
-    print('EXH: _load start');
+    if (kDebugMode) print('EXH: _load start');
     double? userLat;
     double? userLng;
     bool hasLocation = false;
@@ -122,23 +123,23 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
         dev.log('[ExhibitionProvider] sido=$sido', name: 'Exhibition');
       }
     } on TimeoutException {
-      print('EXH: location timeout — fallback to 서울');
+      if (kDebugMode) print('EXH: location timeout — fallback to 서울');
       dev.log('[ExhibitionProvider] location timeout', name: 'Exhibition');
     } catch (e) {
-      print('EXH: location error=$e — fallback to 서울');
+      if (kDebugMode) print('EXH: location error=$e — fallback to 서울');
       dev.log('[ExhibitionProvider] location error: $e', name: 'Exhibition');
       // 위치 실패 → 서울 기준 날짜순
     }
 
-    print('EXH: sido=$sido hasLocation=$hasLocation');
+    if (kDebugMode) print('EXH: sido=$sido hasLocation=$hasLocation');
 
     // API 호출 (§8: 캐시 포함)
     final result = await ExhibitionApi.instance.fetchExhibitions(sido);
-    print('EXH: api returned ${result?.length ?? "null"}');
+    if (kDebugMode) print('EXH: api returned ${result?.length ?? "null"}');
 
     if (result == null) {
       // API 실패 + 캐시 없음 → 섹션 숨김 (빈 리스트)
-      print('EXH: result null — section hidden');
+      if (kDebugMode) print('EXH: result null — section hidden');
       return ExhibitionState(
         items: const [],
         isLoading: false,
@@ -177,7 +178,7 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
 
     // 최대 10개
     final limited = sorted.take(10).toList();
-    print('EXH: final items=${limited.length}');
+    if (kDebugMode) print('EXH: final items=${limited.length}');
 
     return ExhibitionState(
       items: limited,
