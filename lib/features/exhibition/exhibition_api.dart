@@ -38,10 +38,11 @@ class ExhibitionApi {
   DateTime? _cachedDate;
 
   /// 허용 realmName 목록 (문화행사)
+  /// 뮤즐리는 박물관·미술관·과학관 중심 앱 — 연극·뮤지컬/오페라·음악/콘서트 제외
   static const Set<String> allowedRealms = {
     '전시',
-    '뮤지컬/오페라',
-    '연극',
+    '교육/체험',
+    '행사/축제',
   };
 
   /// sido 기준 현재 진행 중인 문화행사 목록 반환 (캐시 우선)

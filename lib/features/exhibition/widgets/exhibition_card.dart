@@ -183,12 +183,12 @@ class _RealmBadge extends StatelessWidget {
           AppTheme.primaryColor.withValues(alpha: 0.12),
           AppTheme.primaryColor,
         );
-      case '뮤지컬/오페라':
+      case '교육/체험':
         return (
-          const Color(0xFF9B59B6).withValues(alpha: 0.12),
-          const Color(0xFF9B59B6),
+          const Color(0xFF27AE60).withValues(alpha: 0.12),
+          const Color(0xFF27AE60),
         );
-      case '연극':
+      case '행사/축제':
         return (
           const Color(0xFFE67E22).withValues(alpha: 0.12),
           const Color(0xFFE67E22),
