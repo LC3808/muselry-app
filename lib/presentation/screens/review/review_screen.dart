@@ -1118,18 +1118,25 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
   }
 
   /// v0.5.2: 삭제 예약된 기존 사진 처리 (DB soft delete → Storage 삭제)
-  Future<void> applyPendingDeletes() async {
-    if (widget.reviewId == null) return;
-    // 삭제 예약 목록 기준으로 DB soft delete + Storage 삭제
+  /// 반환: StorageDeleteResult (삭제 요청/성공/실패 집계)
+  Future<StorageDeleteResult> applyPendingDeletes() async {
+    if (widget.reviewId == null || _pendingDeleteImages.isEmpty) {
+      return const StorageDeleteResult(requested: 0, succeeded: 0, failed: 0);
+    }
+    // 삭제 예약 목록 기준으로 DB soft delete 성공 항목만 Storage 삭제
+    final pathsToDelete = <String>[];
     for (final img in _pendingDeleteImages.values) {
       try {
         await _imageRepo.softDeleteImageRow(img.id);
-        if (kDebugMode) print('REVIEW_EDIT: image row removed id=\${img.id}');
-        await _imageRepo.deleteStorageFile(img.storagePath);
+        if (kDebugMode) print('REVIEW_EDIT: image row removed id=${img.id}');
+        pathsToDelete.add(img.storagePath);
       } catch (e) {
-        if (kDebugMode) print('REVIEW_EDIT: softDelete failed id=\${img.id}: \$e');
+        if (kDebugMode) print('REVIEW_EDIT: softDelete failed id=${img.id}: $e');
+        // DB soft delete 실패 시 Storage 삭제 금지
       }
     }
+    // DB soft delete 성공 항목만 Storage 삭제 (집계)
+    final storageResult = await _imageRepo.deleteStorageFiles(pathsToDelete);
     // 남은 published 사진 재조회 후 display_order 0부터 재정렬
     final remaining = _existingImages
         .where((img) => !_pendingDeleteImages.containsKey(img.id))
@@ -1146,10 +1153,11 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
           _pendingDeleteImages.clear();
         });
       }
-      if (kDebugMode) print('REVIEW_EDIT: existingImages refreshed count=\${refreshed.length}');
+      if (kDebugMode) print('REVIEW_EDIT: existingImages refreshed count=${refreshed.length}');
     } catch (e) {
-      if (kDebugMode) print('REVIEW_EDIT: existingImages refresh failed: \$e');
+      if (kDebugMode) print('REVIEW_EDIT: existingImages refresh failed: $e');
     }
+    return storageResult;
   }
 
   @override

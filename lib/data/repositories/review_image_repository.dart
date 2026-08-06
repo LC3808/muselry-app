@@ -4,6 +4,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/review_image.dart';
 
+/// Storage 삭제 결과 집계 (v0.5.2)
+class StorageDeleteResult {
+  final int requested;
+  final int succeeded;
+  final int failed;
+
+  const StorageDeleteResult({
+    required this.requested,
+    required this.succeeded,
+    required this.failed,
+  });
+
+  bool get allSucceeded => failed == 0;
+}
+
 /// 리뷰 사진 Repository (v0.5.1)
 ///
 /// 금지:
@@ -149,14 +164,119 @@ class ReviewImageRepository {
         .eq('id', imageId);
   }
 
-  /// Storage 파일 삭제 (orphan 허용)
-  Future<void> deleteStorageFile(String storagePath) async {
+  /// Storage 파일 삭제 (반환값 검증 + 파일 존재 확인 포함)
+  ///
+  /// - bucket 이름을 storagePath 앞에 중복 포함 금지
+  /// - remove()에는 bucket 내부 상대 경로만 전달 (예: reviews/{uid}/{reviewId}/{uuid}.webp)
+  /// - public URL 전달 금지
+  ///
+  /// 반환: true = 삭제 확인, false = 삭제 미확인 또는 실패
+  Future<bool> deleteStorageFile(String storagePath) async {
     try {
-      await _client.storage.from(_bucket).remove([storagePath]);
-      if (kDebugMode) print('REVIEW_EDIT: storage file deleted');
+      if (kDebugMode) {
+        print('REVIEW_EDIT: storage delete request path=$storagePath');
+      }
+
+      final removedFiles = await _client.storage
+          .from(_bucket)
+          .remove([storagePath]);
+
+      if (kDebugMode) {
+        print('REVIEW_EDIT: storage delete result count=${removedFiles.length}');
+      }
+
+      if (removedFiles.isEmpty) {
+        if (kDebugMode) {
+          print('REVIEW_EDIT: storage delete not confirmed path=$storagePath');
+        }
+        // 삭제 후 파일 존재 여부 검증 (kDebugMode에서만)
+        if (kDebugMode) await _verifyFileDeleted(storagePath);
+        return false;
+      }
+
+      if (kDebugMode) {
+        print('REVIEW_EDIT: storage delete success path=$storagePath');
+        await _verifyFileDeleted(storagePath);
+      }
+
+      return true;
+    } on StorageException catch (e) {
+      if (kDebugMode) {
+        print(
+          'REVIEW_EDIT: storage delete failed '
+          'code=${e.statusCode} '
+          'message=${e.message} '
+          'path=$storagePath',
+        );
+      }
+      return false;
     } catch (e) {
-      if (kDebugMode) print('REVIEW_EDIT: storage delete failed (orphan): $e');
+      if (kDebugMode) {
+        print(
+          'REVIEW_EDIT: storage delete failed '
+          'type=${e.runtimeType} '
+          'path=$storagePath',
+        );
+      }
+      return false;
     }
+  }
+
+  /// 삭제 후 파일 존재 여부 검증 (kDebugMode 전용)
+  Future<void> _verifyFileDeleted(String storagePath) async {
+    try {
+      final folderPath = storagePath.contains('/')
+          ? storagePath.substring(0, storagePath.lastIndexOf('/'))
+          : '';
+      final fileName = storagePath.substring(storagePath.lastIndexOf('/') + 1);
+
+      final remainingFiles = await _client.storage
+          .from(_bucket)
+          .list(path: folderPath);
+
+      final stillExists = remainingFiles.any((file) => file.name == fileName);
+      print(
+        'REVIEW_EDIT: storage verify exists=$stillExists '
+        'path=$storagePath',
+      );
+    } catch (e) {
+      print('REVIEW_EDIT: storage verify failed: $e');
+    }
+  }
+
+  /// 여러 Storage 파일 삭제 + 결과 집계
+  ///
+  /// DB soft delete 성공 항목만 전달받아야 함
+  Future<StorageDeleteResult> deleteStorageFiles(
+      List<String> storagePaths) async {
+    if (storagePaths.isEmpty) {
+      return const StorageDeleteResult(requested: 0, succeeded: 0, failed: 0);
+    }
+
+    int succeeded = 0;
+    int failed = 0;
+
+    for (final path in storagePaths) {
+      final ok = await deleteStorageFile(path);
+      if (ok) {
+        succeeded++;
+      } else {
+        failed++;
+      }
+    }
+
+    if (kDebugMode) {
+      print(
+        'REVIEW_EDIT: storage delete requested=${storagePaths.length} '
+        'success=$succeeded failed=$failed',
+      );
+    }
+
+    return StorageDeleteResult(
+      requested: storagePaths.length,
+      succeeded: succeeded,
+      failed: failed,
+    );
   }
 
   /// 리뷰 삭제 시 해당 review_id의 모든 published 사진을 removed로 변경
