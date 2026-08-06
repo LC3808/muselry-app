@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../config/router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../config/router.dart';
 import '../../../core/utils/nickname_utils.dart'; // §8-1
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/comment.dart';
@@ -256,8 +256,13 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
               ),
             ),
 
-          // 리뷰 본문
-          Padding(
+          // 리뷰 본문 (탭 → 리뷰 상세, v0.5.2)
+          GestureDetector(
+            onTap: () => context.push(
+              AppRoutes.reviewDetail.replaceFirst(':reviewId', widget.review.id),
+            ),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,6 +348,7 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
               ],
             ),
           ),
+          ), // GestureDetector
 
           // M5: 댓글 토글 버튼
           InkWell(

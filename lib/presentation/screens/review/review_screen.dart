@@ -17,6 +17,9 @@ import '../../widgets/common/user_avatar.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../../data/repositories/review_image_repository.dart';
+import '../../../domain/models/review_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/media/image_url_resolver.dart';
 import '../../../features/review/services/review_image_upload_service.dart';
 
 /// 박물관 리뷰 화면.
@@ -75,6 +78,9 @@ class ReviewScreen extends ConsumerWidget {
             final reviewIdsKey = reviews.map((r) => r.id).join(',');
             final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
             final counts = countsAsync.valueOrNull ?? {};
+            // v0.5.2: 대표사진 일괄 조회
+            final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
+            final thumbnails = thumbnailsAsync.valueOrNull ?? {};
 
             return ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -87,6 +93,7 @@ class ReviewScreen extends ConsumerWidget {
                   review: review,
                   isMyReview: isMyReview,
                   commentCount: counts[review.id],
+                  thumbnail: thumbnails[review.id], // v0.5.2: 대표사진
                   onTap: () => context.push(
                     AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
                   ),
@@ -224,13 +231,17 @@ class ReviewScreen extends ConsumerWidget {
       );
       return;
     }
+    // v0.5.2: GlobalKey builder 밖에서 생성 + reviewId 전달
+    final editSheetKey = GlobalKey<_ReviewFormSheetState>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ReviewFormSheet(
+        key: editSheetKey,
         museumId: museumId,
         visitId: review.visitId,
+        reviewId: review.id, // v0.5.2: 기존 사진 로드
         isEdit: true,
         initialRating: review.rating,
         initialContent: review.content,
@@ -244,9 +255,22 @@ class ReviewScreen extends ConsumerWidget {
                   content: content,
                   visitedOn: visitedOn,
                 );
+            // v0.5.2: 삭제 예약 처리 + 신규 사진 업로드
+            await editSheetKey.currentState?.applyPendingDeletes();
+            final failedCount = await editSheetKey.currentState
+                ?.uploadPendingImages(review.id) ?? 0;
             if (context.mounted) {
               Navigator.pop(context);
-              _showStatusSnackBar(context, updated.status);
+              if (failedCount > 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('수정됐지만 $failedCount장의 사진을 올리지 못했습니다.'),
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+              } else {
+                _showStatusSnackBar(context, updated.status);
+              }
             }
             // v1.10: microtask로 invalidate (build 중 setState 방지)
             Future.microtask(() {
@@ -255,6 +279,8 @@ class ReviewScreen extends ConsumerWidget {
                   .updateReview(updated);
               ref.invalidate(myReviewsForMuseumProvider(museumId));
               ref.invalidate(myReviewForVisitProvider(updated.visitId));
+              ref.invalidate(reviewImagesProvider(review.id));
+              ref.invalidate(communityReviewsProvider);
             });
           } on PostgrestException catch (e) {
             if (context.mounted) {
@@ -299,15 +325,21 @@ class ReviewScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                // v0.5.1: 원자성 보완 — Storage path 먼저 확보 후 리뷰 삭제
+                // v0.5.2: 삭제 정합성 — storage_path 확보 → review soft delete
+                //          → review_images soft delete → Storage 삭제
                 final imgRepo = ref.read(reviewImageRepositoryProvider);
+                // 1. storage_path 목록 메모리 확보 (soft delete 후 조회 불가)
                 final storagePaths = await imgRepo.loadStoragePaths(review.id);
-                // 리뷰 DB 삭제 (CASCADE로 review_images 행도 삭제됨)
+                if (kDebugMode) print('REVIEW_DELETE: image rows to remove=${storagePaths.length}');
+                // 2. reviews.status = removed
                 await ref
                     .read(myReviewsProvider.notifier)
                     .deleteReview(review.id);
-                // 리뷰 삭제 성공 후 Storage 후처리 (실패 허용 — orphan)
+                // 3. review_images.status = removed (ON DELETE CASCADE 없음)
+                await imgRepo.softDeleteAllByReviewId(review.id);
+                // 4. Storage 파일 삭제 (orphan 허용)
                 await imgRepo.deleteStorageFilesByPaths(storagePaths);
+                if (kDebugMode) print('REVIEW_DELETE: storage deleted=${storagePaths.length}');
                 ref
                     .read(museumReviewsProvider(museumId).notifier)
                     .removeReview(review.id);
@@ -744,6 +776,7 @@ class _ReviewCard extends StatelessWidget {
   final Review review;
   final bool isMyReview;
   final int? commentCount; // R22: 댓글 수 맱지
+  final ReviewImage? thumbnail; // v0.5.2: 대표사진
   final VoidCallback? onTap; // R22: 단일 리뷰 화면으로 이동
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
@@ -753,6 +786,7 @@ class _ReviewCard extends StatelessWidget {
     required this.review,
     required this.isMyReview,
     this.commentCount,
+    this.thumbnail,
     this.onTap,
     this.onEdit,
     this.onDelete,
@@ -875,6 +909,25 @@ class _ReviewCard extends StatelessWidget {
                 review.content,
                 style: theme.textTheme.bodyMedium,
               ),
+              // v0.5.2: 대표사진 (16:9)
+              if (thumbnail != null) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: CachedNetworkImage(
+                      imageUrl: resolveImageUrl(thumbnail!.storagePath),
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(color: const Color(0xFFEEEEEE)),
+                      errorWidget: (_, __, ___) => Container(
+                        color: const Color(0xFFEEEEEE),
+                        child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               // R22: 날짜 + 댓글 수 뱃지 Row / R27: 방문일 추가
               Row(
@@ -957,6 +1010,7 @@ class _StarRow extends StatelessWidget {
 class ReviewFormSheet extends StatefulWidget {
   final String museumId;
   final String visitId;
+  final String? reviewId; // v0.5.2: 수정 모드에서 기존 사진 로드용
   final DateTime? visitedAt;
   final double? initialRating;
   final String? initialContent;
@@ -967,6 +1021,7 @@ class ReviewFormSheet extends StatefulWidget {
     super.key,
     required this.museumId,
     required this.visitId,
+    this.reviewId,
     this.visitedAt,
     this.initialRating,
     this.initialContent,
@@ -987,10 +1042,13 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
   static const int _minLength = 10;  // DB reviews_content_check 제약과 일치
   static const int _maxLength = 500; // DB reviews_content_check 제약과 일치
 
-  // v0.5.1: 사진 첨부
-  final List<File> _pendingImages = []; // 선택된 임시 파일 목록
+  // v0.5.1/v0.5.2: 사진 첨부
+  final List<File> _pendingImages = []; // 신규 선택 임시 파일
+  List<ReviewImage> _existingImages = []; // 수정 모드: 기존 published 사진
+  final Set<String> _pendingDeleteIds = {}; // 수정 모드: 삭제 예약 imageId
   bool _imageUploading = false;
   late ReviewImageUploadService _imageService;
+  late ReviewImageRepository _imageRepo;
   // A: 명시적 FocusNode — builder 재실행 시 포커스 유지
   late final FocusNode _contentFocusNode;
 
@@ -1002,13 +1060,34 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
         TextEditingController(text: widget.initialContent ?? '');
     // R27: 방문일 기본값 = 방문 기록의 visitedAt, 없으면 오늘
     _visitedOn = widget.visitedAt ?? DateTime.now();
-    // v0.5.1: 사진 서비스 초기화
+    // v0.5.1/v0.5.2: 사진 서비스 초기화
     final client = Supabase.instance.client;
-    final repo = ReviewImageRepository(client);
-    _imageService = ReviewImageUploadService(client, repo);
+    _imageRepo = ReviewImageRepository(client);
+    _imageService = ReviewImageUploadService(client, _imageRepo);
     // A: FocusNode 초기화
     _contentFocusNode = FocusNode();
+    // v0.5.2: 수정 모드 — 기존 사진 로드
+    if (widget.isEdit && widget.reviewId != null) {
+      _loadExistingImages();
+    }
   }
+
+  /// v0.5.2: 수정 모드 기존 사진 로드
+  Future<void> _loadExistingImages() async {
+    try {
+      final images = await _imageRepo.loadImages(widget.reviewId!);
+      if (mounted) setState(() => _existingImages = images);
+      if (kDebugMode) {
+        print('REVIEW_EDIT: existing=${images.length} pendingDelete=0 pendingAdd=0');
+      }
+    } catch (e) {
+      if (kDebugMode) print('REVIEW_EDIT: loadExistingImages failed: $e');
+    }
+  }
+
+  /// v0.5.2: 총 사진 수 (기존 - 삭제예약 + 신규)
+  int get _totalImageCount =>
+      (_existingImages.length - _pendingDeleteIds.length) + _pendingImages.length;
 
   @override
   void dispose() {
@@ -1056,7 +1135,7 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
 
   /// v0.5.1: 사진 선택 (갤러리)
   Future<void> _pickImage() async {
-    if (_imageService.isMaxReached(_pendingImages.length)) return;
+    if (_imageService.isMaxReached(_totalImageCount)) return;
     setState(() => _imageUploading = true);
     try {
       final file = await _imageService.pickAndCompress();
@@ -1090,23 +1169,50 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
 
   /// v0.5.1: 리뷰 저장 후 사진 업로드 (review_id 획득 후 호출)
   /// v0.5.1: 사진 업로드 — 실패 건수 반환 (0 = 전체 성공)
+  /// v0.5.1/v0.5.2: 신규 사진 업로드 — display_order는 기존 남은 사진 이후부터
   Future<int> uploadPendingImages(String reviewId) async {
     if (_pendingImages.isEmpty) return 0;
+    // 수정 모드: 삭제 예약 제외한 기존 사진 수 이후부터 order 시작
+    final baseOrder = widget.isEdit
+        ? (_existingImages.length - _pendingDeleteIds.length)
+        : 0;
     int failedCount = 0;
     for (int i = 0; i < _pendingImages.length; i++) {
       try {
         await _imageService.uploadAndInsert(
           reviewId: reviewId,
           file: _pendingImages[i],
-          displayOrder: i,
+          displayOrder: baseOrder + i,
           isJpeg: _pendingImages[i].path.endsWith('.jpg'),
         );
+        if (kDebugMode) print('REVIEW_EDIT: upload success index=$i');
       } catch (e) {
-        if (kDebugMode) print('REVIEW: image upload failed index=$i: $e');
+        if (kDebugMode) print('REVIEW_EDIT: upload failed index=$i: $e');
         failedCount++;
       }
     }
     return failedCount;
+  }
+
+  /// v0.5.2: 삭제 예약된 기존 사진 처리 (DB soft delete → Storage 삭제)
+  Future<void> applyPendingDeletes() async {
+    for (final img in _existingImages) {
+      if (!_pendingDeleteIds.contains(img.id)) continue;
+      try {
+        await _imageRepo.softDeleteImageRow(img.id);
+        if (kDebugMode) print('REVIEW_EDIT: image row removed id=${img.id}');
+        await _imageRepo.deleteStorageFile(img.storagePath);
+      } catch (e) {
+        if (kDebugMode) print('REVIEW_EDIT: softDelete failed id=${img.id}: $e');
+      }
+    }
+    // display_order 재정렬
+    final remaining = _existingImages
+        .where((img) => !_pendingDeleteIds.contains(img.id))
+        .toList();
+    if (remaining.isNotEmpty) {
+      await _imageRepo.reorderImages(remaining.map((img) => img.id).toList());
+    }
   }
 
   @override
@@ -1248,8 +1354,8 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              // v0.5.1: 사진 첨부 섹션
-              if (!widget.isEdit) ...[
+              // v0.5.2: 사진 첨부 섹션 (작성/수정 모두 표시)
+              ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1262,7 +1368,7 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
                       ),
                     ),
                     Text(
-                      '${_pendingImages.length}/${_imageService.maxImages}',
+                      '$_totalImageCount/${_imageService.maxImages}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondaryColor,
@@ -1271,33 +1377,49 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (_pendingImages.isNotEmpty)
-                  SizedBox(
-                    height: 90,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _pendingImages.length +
-                          (_imageService.isMaxReached(_pendingImages.length) ? 0 : 1),
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        if (index == _pendingImages.length) {
-                          return _AddPhotoButton(
-                            onTap: _imageUploading ? null : _pickImage,
-                            isLoading: _imageUploading,
-                          );
-                        }
-                        return _PendingImageTile(
-                          file: _pendingImages[index],
-                          onRemove: () => _removeImage(index),
+                SizedBox(
+                  height: 90,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _existingImages.length
+                        + _pendingImages.length
+                        + (_imageService.isMaxReached(_totalImageCount) ? 0 : 1),
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      // 기존 사진
+                      if (index < _existingImages.length) {
+                        final img = _existingImages[index];
+                        final isDeleting = _pendingDeleteIds.contains(img.id);
+                        return _ExistingImageTile(
+                          imageUrl: img.storagePath,
+                          isDeleting: isDeleting,
+                          onToggleDelete: () {
+                            setState(() {
+                              if (isDeleting) {
+                                _pendingDeleteIds.remove(img.id);
+                              } else {
+                                _pendingDeleteIds.add(img.id);
+                              }
+                            });
+                          },
                         );
-                      },
-                    ),
-                  )
-                else
-                  _AddPhotoButton(
-                    onTap: _imageUploading ? null : _pickImage,
-                    isLoading: _imageUploading,
+                      }
+                      // 신규 사진
+                      final pendingIndex = index - _existingImages.length;
+                      if (pendingIndex < _pendingImages.length) {
+                        return _PendingImageTile(
+                          file: _pendingImages[pendingIndex],
+                          onRemove: () => _removeImage(pendingIndex),
+                        );
+                      }
+                      // 추가 버튼
+                      return _AddPhotoButton(
+                        onTap: _imageUploading ? null : _pickImage,
+                        isLoading: _imageUploading,
+                      );
+                    },
                   ),
+                ),
                 const SizedBox(height: 16),
               ],
               // 제출 버튼
@@ -1527,6 +1649,79 @@ class _PendingImageTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── v0.5.2: 기존 사진 타일 (수정 모드) ──────────────────────────────────────
+class _ExistingImageTile extends StatelessWidget {
+  final String imageUrl;
+  final bool isDeleting;
+  final VoidCallback onToggleDelete;
+
+  const _ExistingImageTile({
+    required this.imageUrl,
+    required this.isDeleting,
+    required this.onToggleDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedUrl = resolveImageUrl(imageUrl);
+    return GestureDetector(
+      onTap: onToggleDelete,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 90,
+              height: 90,
+              child: CachedNetworkImage(
+                imageUrl: resolvedUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: const Color(0xFFEEEEEE)),
+                errorWidget: (_, __, ___) => Container(
+                  color: const Color(0xFFEEEEEE),
+                  child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                ),
+              ),
+            ),
+          ),
+          if (isDeleting)
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  color: Colors.black54,
+                  child: const Center(
+                    child: Icon(Icons.delete_outline, color: Colors.white, size: 28),
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onToggleDelete,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: isDeleting ? Colors.red : Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isDeleting ? Icons.undo : Icons.close,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

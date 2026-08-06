@@ -139,6 +139,48 @@ class ReviewImageRepository {
   String getPublicUrl(String storagePath) {
     return _client.storage.from(_bucket).getPublicUrl(storagePath);
   }
+
+  /// 리뷰 사진 행 soft delete (status = removed)
+  /// 실패 시 예외 rethrow — Storage 삭제는 호출자가 별도 수행
+  Future<void> softDeleteImageRow(String imageId) async {
+    await _client
+        .from('review_images')
+        .update({'status': 'removed'})
+        .eq('id', imageId);
+  }
+
+  /// Storage 파일 삭제 (orphan 허용)
+  Future<void> deleteStorageFile(String storagePath) async {
+    try {
+      await _client.storage.from(_bucket).remove([storagePath]);
+      if (kDebugMode) print('REVIEW_EDIT: storage file deleted');
+    } catch (e) {
+      if (kDebugMode) print('REVIEW_EDIT: storage delete failed (orphan): $e');
+    }
+  }
+
+  /// 리뷰 삭제 시 해당 review_id의 모든 published 사진을 removed로 변경
+  /// ON DELETE CASCADE가 없으므로 명시 호출 필수
+  Future<void> softDeleteAllByReviewId(String reviewId) async {
+    await _client
+        .from('review_images')
+        .update({'status': 'removed'})
+        .eq('review_id', reviewId)
+        .eq('status', 'published');
+    if (kDebugMode) print('REVIEW_DELETE: image rows removed for reviewId=$reviewId');
+  }
+
+  /// 리뷰 사진 display_order 재정렬 (0,1,2,...)
+  /// 삭제/추가 후 남은 published 사진에 적용
+  Future<void> reorderImages(List<String> orderedImageIds) async {
+    for (int i = 0; i < orderedImageIds.length; i++) {
+      await _client
+          .from('review_images')
+          .update({'display_order': i})
+          .eq('id', orderedImageIds[i]);
+    }
+    if (kDebugMode) print('REVIEW_EDIT: reordered ${orderedImageIds.length} images');
+  }
 }
 
 /// Provider

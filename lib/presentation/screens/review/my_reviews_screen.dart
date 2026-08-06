@@ -6,6 +6,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/review.dart';
 import '../../../presentation/providers/review_provider.dart';
 import 'review_screen.dart' show ReviewFormSheet; // M7-G-6: 수정 시트 재사용 (ReviewFormSheet는 public)
+import '../../../config/router.dart';
+import '../../../domain/models/review_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/media/image_url_resolver.dart';
 
 /// 내 리뷰 목록 화면 (마이페이지 → 내 활동 → 리뷰).
 /// published + pending_review 상태 리뷰만 표시.
@@ -67,6 +71,10 @@ class MyReviewsScreen extends ConsumerWidget {
                 ),
               );
             }
+            // v0.5.2: 대표사진 일괄 조회
+            final reviewIdsKey = reviews.map((r) => r.id).join(',');
+            final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
+            final thumbnails = thumbnailsAsync.valueOrNull ?? {};
             return ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: reviews.length,
@@ -75,6 +83,10 @@ class MyReviewsScreen extends ConsumerWidget {
                 final review = reviews[index];
                 return _MyReviewCard(
                   review: review,
+                  thumbnail: thumbnails[review.id],
+                  onTap: () => context.push(
+                    AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
+                  ),
                   onTapMuseum: () =>
                       context.push('/museum/${review.museumId}'),
                   onEdit: review.isEditable
@@ -216,12 +228,16 @@ class MyReviewsScreen extends ConsumerWidget {
 
 class _MyReviewCard extends StatelessWidget {
   final Review review;
+  final ReviewImage? thumbnail; // v0.5.2: 대표사진
+  final VoidCallback? onTap; // v0.5.2: 리뷰 상세 이동
   final VoidCallback onTapMuseum;
   final VoidCallback? onEdit; // M7-G-6: nullable (수정 기한 만료 시 null)
   final VoidCallback onDelete;
 
   const _MyReviewCard({
     required this.review,
+    this.thumbnail,
+    this.onTap,
     required this.onTapMuseum,
     required this.onEdit,
     required this.onDelete,
@@ -306,6 +322,25 @@ class _MyReviewCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium,
                   ),
+                  // v0.5.2: 대표사진 (16:9)
+                  if (thumbnail != null) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: CachedNetworkImage(
+                          imageUrl: resolveImageUrl(thumbnail!.storagePath),
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(color: const Color(0xFFEEEEEE)),
+                          errorWidget: (_, __, ___) => Container(
+                            color: const Color(0xFFEEEEEE),
+                            child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   // 날짜 + 방문일
                   Row(
