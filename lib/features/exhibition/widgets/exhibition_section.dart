@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:html_unescape/html_unescape.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -15,6 +16,15 @@ import '../exhibition_provider.dart';
 import 'exhibition_card.dart';
 
 final _unescape = HtmlUnescape();
+
+/// 운영자가 검증한 공식 홈페이지 대응표
+/// 키: normalize(place) = 공백 제거 + trim
+/// 값: 공식 URL (https:// 필수)
+/// 대상: museums DB 미등록 장소만 등록 (DB 등록 시설은 자동 제외)
+/// URL 임의 생성 금지 — 운영자 검증 후만 추가
+const Map<String, String> _verifiedHomepages = {
+  '소마미술관': 'https://soma.kspo.or.kr/main',
+};
 
 /// 홈 화면 "내 주변 문화행사" 섹션
 /// - 비동기 독립 로딩 (홈 전체 렌더링 차단 없음)
@@ -139,6 +149,7 @@ class _ExhibitionDetailSheet extends StatefulWidget {
 class _ExhibitionDetailSheetState extends State<_ExhibitionDetailSheet> {
   Museum? _matchedMuseum;
   bool _lookupDone = false;
+  String? _verifiedUrl; // museums DB 미등록 장소의 운영자 검증 공식 URL
 
   @override
   void initState() {
@@ -155,11 +166,36 @@ class _ExhibitionDetailSheetState extends State<_ExhibitionDetailSheet> {
     if (kDebugMode) {
       print('EXH: place="$place" museumMatch=${museum?.id ?? "none"}');
     }
+    // verified homepage: DB 미등록 장소에만 적용
+    // normalize(place) = 공백 제거 + trim
+    final normalized = place.replaceAll(' ', '').trim();
+    final homepage = museum == null ? _verifiedHomepages[normalized] : null;
     if (mounted) {
       setState(() {
         _matchedMuseum = museum;
+        _verifiedUrl = homepage;
         _lookupDone = true;
       });
+    }
+  }
+
+  Future<void> _launchHomepage(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('홈페이지를 열 수 없습니다.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류: $e')),
+        );
+      }
     }
   }
 
@@ -270,7 +306,10 @@ class _ExhibitionDetailSheetState extends State<_ExhibitionDetailSheet> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  // "장소 정보 보기" 버튼 — 매칭 성공 시만 표시
+                  // 버튼 우선순위:
+                  // 1. museumMatch 존재 → "장소 정보 보기"
+                  // 2. museumMatch 없음 + verified homepage 존재 → "공식 홈페이지 보기"
+                  // 3. 둘 다 없음 → 버튼 숨김
                   if (_lookupDone && _matchedMuseum != null)
                     SizedBox(
                       width: double.infinity,
@@ -285,6 +324,23 @@ class _ExhibitionDetailSheetState extends State<_ExhibitionDetailSheet> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.primaryColor,
                           side: const BorderSide(color: AppTheme.primaryColor),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_lookupDone && _verifiedUrl != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _launchHomepage(context, _verifiedUrl!),
+                        icon: const Icon(Icons.open_in_browser, size: 16),
+                        label: const Text('공식 홈페이지 보기'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.accentColor,
+                          side: const BorderSide(color: AppTheme.accentColor),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),

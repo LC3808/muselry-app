@@ -254,9 +254,30 @@ class MuseumRepository {
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 
+  /// 문화행사 place명 → museums.name 별칭 대응표
+  /// 키: normalize(place), 값: normalize(museum.name)
+  /// contains 매칭 금지 — 명시적 대응만 사용
+  static const Map<String, String> _placeAliases = {
+    // 국립현대미술관 서울관 변형
+    '국립현대미술관서울관': '국립현대미술관(서울관)',
+    '국립현대미술관서울': '국립현대미술관(서울관)',
+    '국립현대미술관(서울)': '국립현대미술관(서울관)',
+    // 국립현대미술관 과천관 변형
+    '국립현대미술관과천관': '국립현대미술관(과천관)',
+    '국립현대미술관(과천)': '국립현대미술관(과천관)',
+    // 국립현대미술관 덕수관 변형
+    '국립현대미술관덕수관': '국립현대미술관(덕수관)',
+    '국립현대미술관(덕수)': '국립현대미술관(덕수관)',
+    // 국립중앙박물관 변형
+    '국립중앙박물관': '국립중앙박물관',
+    // 한가의집박물관 변형
+    '한가의집박물관': '한가의집박물관',
+  };
+
   /// 문화행사 장소명으로 museums 테이블에서 정규화 일치 조회
   /// normalize(s) = 공백 전부 제거 + trim
-  /// 1차: normalize(place) == normalize(museum.name) 정확일치만 사용 (contains 금지)
+  /// 1차: normalize(place) == normalize(museum.name) 정확일치
+  /// 2차: _placeAliases 대응표 룩업 (contains 금지)
   /// 없으면 null 반환
   Future<Museum?> findMuseumByName(String place) async {
     final normalized = place.replaceAll(' ', '').trim();
@@ -268,9 +289,19 @@ class MuseumRepository {
           .eq('is_active', true)
           .limit(500);
       final museums = (response as List).map((e) => Museum.fromJson(e)).toList();
+      // 1차: 정확일치
       for (final m in museums) {
         final mNorm = m.name.replaceAll(' ', '').trim();
         if (mNorm == normalized) return m;
+      }
+      // 2차: alias 대응표 fallback
+      final aliasTarget = _placeAliases[normalized];
+      if (aliasTarget != null) {
+        final aliasNorm = aliasTarget.replaceAll(' ', '').trim();
+        for (final m in museums) {
+          final mNorm = m.name.replaceAll(' ', '').trim();
+          if (mNorm == aliasNorm) return m;
+        }
       }
       return null;
     } catch (_) {
