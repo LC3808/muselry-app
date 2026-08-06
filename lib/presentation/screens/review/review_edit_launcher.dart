@@ -89,6 +89,7 @@ Future<void> showReviewEditSheet({
           // invalidate만으로는 watch 구독자가 rebuild될 때까지 지연될 수 있어
           // ref.refresh로 즉시 재조회 트리거
           Future.microtask(() {
+            // ignore: unused_result
             ref.refresh(reviewImagesProvider(review.id));
             ref.invalidate(communityReviewsProvider);
             ref.invalidate(museumReviewsProvider(review.museumId));
