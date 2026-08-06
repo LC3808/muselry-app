@@ -253,4 +253,28 @@ class MuseumRepository {
 
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
+
+  /// 문화행사 장소명으로 museums 테이블에서 정규화 일치 조회
+  /// normalize(s) = 공백 전부 제거 + trim
+  /// 1차: normalize(place) == normalize(museum.name) 정확일치만 사용 (contains 금지)
+  /// 없으면 null 반환
+  Future<Museum?> findMuseumByName(String place) async {
+    final normalized = place.replaceAll(' ', '').trim();
+    if (normalized.isEmpty) return null;
+    try {
+      final response = await _client
+          .from('museums')
+          .select()
+          .eq('is_active', true)
+          .limit(500);
+      final museums = (response as List).map((e) => Museum.fromJson(e)).toList();
+      for (final m in museums) {
+        final mNorm = m.name.replaceAll(' ', '').trim();
+        if (mNorm == normalized) return m;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

@@ -1,9 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../exhibition_api.dart';
 import '../exhibition_model.dart';
+
+final _unescape = HtmlUnescape();
 
 class ExhibitionCard extends StatelessWidget {
   final Exhibition exhibition;
@@ -100,9 +103,9 @@ class ExhibitionCard extends StatelessWidget {
                   // 분야 배지 (1줄, 고정)
                   _RealmBadge(realm: exhibition.realmName),
                   const SizedBox(height: 4),
-                  // 제목 (최대 2줄)
+                  // 제목 (최대 2줄, HTML 엔티티 디코딩)
                   Text(
-                    exhibition.title,
+                    _unescape.convert(exhibition.title),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -113,9 +116,9 @@ class ExhibitionCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // 장소 (최대 1줄)
+                  // 장소 (최대 1줄, HTML 엔티티 디코딩)
                   Text(
-                    exhibition.place,
+                    _unescape.convert(exhibition.place),
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppTheme.textSecondaryColor,
