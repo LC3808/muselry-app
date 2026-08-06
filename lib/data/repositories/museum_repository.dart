@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/models/museum.dart';
 import '../../presentation/providers/museum_provider.dart';
@@ -254,54 +255,69 @@ class MuseumRepository {
     return (response as List).map((e) => Museum.fromJson(e)).toList();
   }
 
-  /// 문화행사 place명 → museums.name 별칭 대응표
-  /// 키: normalize(place), 값: normalize(museum.name)
-  /// contains 매칭 금지 — 명시적 대응만 사용
-  static const Map<String, String> _placeAliases = {
-    // 국립현대미술관 서울관 변형
-    '국립현대미술관서울관': '국립현대미술관(서울관)',
-    '국립현대미술관서울': '국립현대미술관(서울관)',
-    '국립현대미술관(서울)': '국립현대미술관(서울관)',
-    // 국립현대미술관 과천관 변형
-    '국립현대미술관과천관': '국립현대미술관(과천관)',
-    '국립현대미술관(과천)': '국립현대미술관(과천관)',
-    // 국립현대미술관 덕수관 변형
-    '국립현대미술관덕수관': '국립현대미술관(덕수관)',
-    '국립현대미술관(덕수)': '국립현대미술관(덕수관)',
-    // 국립중앙박물관 변형
-    '국립중앙박물관': '국립중앙박물관',
-    // 한가의집박물관 변형
-    '한가의집박물관': '한가의집박물관',
-  };
+  // museum_aliases 메모리 캐시 (세션 내 재사용)
+  // 키: normalized_alias, 값: museum_id
+  Map<String, String>? _aliasCache;
+
+  /// museum_aliases 테이블에서 alias 매핑 로드 (normalized_alias → museum_id)
+  /// 이미 로드된 경우 캐시 반환
+  Future<Map<String, String>> _loadAliases() async {
+    if (_aliasCache != null) return _aliasCache!;
+    try {
+      final response = await _client
+          .from('museum_aliases')
+          .select('normalized_alias, museum_id');
+      _aliasCache = {
+        for (final row in response as List)
+          (row['normalized_alias'] as String): (row['museum_id'] as String),
+      };
+    } catch (_) {
+      _aliasCache = {};
+    }
+    return _aliasCache!;
+  }
 
   /// 문화행사 장소명으로 museums 테이블에서 정규화 일치 조회
   /// normalize(s) = 공백 전부 제거 + trim
   /// 1차: normalize(place) == normalize(museum.name) 정확일치
-  /// 2차: _placeAliases 대응표 룩업 (contains 금지)
-  /// 없으면 null 반환
+  /// 2차: normalize(place) == normalize(museum.name) 정규화 일치 (대소문자 동일)
+  /// 3차: museum_aliases.normalized_alias 일치 (DB 기반, 코드 내부 Map 제거)
+  /// 실패 시 null 반환 + kDebugMode 미매칭 로그
   Future<Museum?> findMuseumByName(String place) async {
     final normalized = place.replaceAll(' ', '').trim();
     if (normalized.isEmpty) return null;
     try {
+      // museums 목록 로드
       final response = await _client
           .from('museums')
           .select()
           .eq('is_active', true)
           .limit(500);
       final museums = (response as List).map((e) => Museum.fromJson(e)).toList();
-      // 1차: 정확일치
+
+      // 1차: 정확일치 (name 원본)
+      for (final m in museums) {
+        if (m.name == place.trim()) return m;
+      }
+      // 2차: 정규화 일치 (normalize 후 비교)
       for (final m in museums) {
         final mNorm = m.name.replaceAll(' ', '').trim();
         if (mNorm == normalized) return m;
       }
-      // 2차: alias 대응표 fallback
-      final aliasTarget = _placeAliases[normalized];
-      if (aliasTarget != null) {
-        final aliasNorm = aliasTarget.replaceAll(' ', '').trim();
+
+      // 3차: museum_aliases DB 룩업
+      final aliases = await _loadAliases();
+      final museumId = aliases[normalized];
+      if (museumId != null) {
         for (final m in museums) {
-          final mNorm = m.name.replaceAll(' ', '').trim();
-          if (mNorm == aliasNorm) return m;
+          if (m.id == museumId) return m;
         }
+      }
+
+      // 미매칭 로그 (kDebugMode)
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('EXH: unmatched place=$place');
       }
       return null;
     } catch (_) {
