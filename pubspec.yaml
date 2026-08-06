@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.4.0+36
+version: 0.5.0+37
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -73,6 +73,12 @@ dependencies:
   xml: ^6.5.0                # v0.4.0: 문화정보 OpenAPI XML 파싱
   http: ^1.2.2               # v0.4.0: 문화정보 OpenAPI HTTP 호출
   html_unescape: ^2.0.0      # v0.4.x: 문화행사 제목/장소 HTML 엔티티 디코딩
+  # v0.5.0: 프로필 사진 변경
+  image_picker: ^1.1.2
+  image_cropper: ^9.0.0
+  flutter_image_compress: ^2.3.0
+  uuid: ^4.5.1
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

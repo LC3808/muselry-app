@@ -44,6 +44,18 @@ class ProfileNotifier extends AsyncNotifier<Profile?> {
     state = AsyncData(updated);
   }
 
+  /// v0.5.0: avatar_storage_path 직접 업데이트 (AvatarUploadService에서 호출)
+  /// newPath=null 이면 기본 이미지로 리셋
+  Future<void> updateAvatarStoragePath(String? newPath) async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData(
+      newPath == null
+          ? current.copyWith(clearAvatarStoragePath: true)
+          : current.copyWith(avatarStoragePath: newPath),
+    );
+  }
+
   /// 프로필 새로고침
   Future<void> refresh() async {
     state = const AsyncLoading();

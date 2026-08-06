@@ -1,5 +1,6 @@
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,8 @@ import 'package:package_info_plus/package_info_plus.dart'; // M8-3
 
 import '../../../config/router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../features/profile/services/avatar_upload_service.dart';
+import '../../../domain/models/profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/comment_provider.dart'; // unreadNotificationCountProvider
 import '../../providers/bookmark_provider.dart';
@@ -134,9 +137,9 @@ class _ProfileSection extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // 아바타
-          _AvatarWidget(
-            avatarUrl: profileAsync.valueOrNull?.avatarUrl,
+          // 아바타 (터치 시 사진 변경 BottomSheet)
+          _TappableAvatarWidget(
+            profile: profileAsync.valueOrNull,
             displayName: displayName,
           ),
           const SizedBox(width: 16),
@@ -201,47 +204,225 @@ class _ProfileSection extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 아바타 위젯
+// v0.5.0 터치 가능 아바타 위젯
 // ─────────────────────────────────────────────────────────────────────────────
-class _AvatarWidget extends StatelessWidget {
-  final String? avatarUrl;
+/// 프로필 이미지 우선순위:
+///   1순위: avatarStoragePath (Supabase Storage public URL)
+///   2순위: avatarUrl (OAuth 기본 이미지)
+///   3순위: 이니셜 기본 아바타
+class _TappableAvatarWidget extends ConsumerStatefulWidget {
+  final Profile? profile;
   final String displayName;
 
-  const _AvatarWidget({this.avatarUrl, required this.displayName});
+  const _TappableAvatarWidget({
+    required this.profile,
+    required this.displayName,
+  });
+
+  @override
+  ConsumerState<_TappableAvatarWidget> createState() =>
+      _TappableAvatarWidgetState();
+}
+
+class _TappableAvatarWidgetState
+    extends ConsumerState<_TappableAvatarWidget> {
+  bool _uploading = false;
+  final _service = AvatarUploadService();
 
   @override
   Widget build(BuildContext context) {
-    if (avatarUrl != null && avatarUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 30,
-        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-        child: ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: avatarUrl!,
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => _initials(displayName),
-            errorWidget: (_, __, ___) => _initials(displayName),
+    final effectiveUrl = _resolveAvatarUrl(widget.profile);
+
+    return GestureDetector(
+      onTap: _uploading ? null : () => _showAvatarSheet(context),
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+            child: _uploading
+                ? const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : ClipOval(
+                    child: effectiveUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: effectiveUrl,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                _initialsWidget(widget.displayName),
+                            errorWidget: (_, __, ___) =>
+                                _initialsWidget(widget.displayName),
+                          )
+                        : _initialsWidget(widget.displayName),
+                  ),
           ),
-        ),
-      );
-    }
-    return CircleAvatar(
-      radius: 30,
-      backgroundColor: AppTheme.primaryColor,
-      child: _initials(displayName),
+          // 카메라 아이콘 오버레이
+          if (!_uploading)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: const Icon(
+                  Icons.camera_alt,
+                  size: 10,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _initials(String name) {
+  /// 프로필 이미지 URL 우선순위 결정
+  String? _resolveAvatarUrl(Profile? profile) {
+    if (profile == null) return null;
+    // 1순위: avatarStoragePath
+    if (profile.avatarStoragePath != null &&
+        profile.avatarStoragePath!.isNotEmpty) {
+      return _service.getPublicUrl(profile.avatarStoragePath!);
+    }
+    // 2순위: avatarUrl (OAuth)
+    if (profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty) {
+      return profile.avatarUrl;
+    }
+    return null;
+  }
+
+  void _showAvatarSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.dividerColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('사진 변경'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _changeAvatar();
+              },
+            ),
+            if (widget.profile?.avatarStoragePath != null)
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('기본 이미지로 변경'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _resetAvatar();
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('취소'),
+              onTap: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeAvatar() async {
+    if (_uploading) return;
+    setState(() => _uploading = true);
+    try {
+      final oldPath = widget.profile?.avatarStoragePath;
+      final newPath = await _service.pickAndUpload(oldStoragePath: oldPath);
+      if (newPath != null) {
+        // ⑥ Provider refresh
+        await ref
+            .read(profileProvider.notifier)
+            .updateAvatarStoragePath(newPath);
+        if (kDebugMode) print('PROFILE: avatar upload success');
+      }
+    } on AvatarUploadException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _resetAvatar() async {
+    if (_uploading) return;
+    setState(() => _uploading = true);
+    try {
+      final oldPath = widget.profile?.avatarStoragePath;
+      final ok = await _service.resetToDefault(oldStoragePath: oldPath);
+      if (ok) {
+        await ref
+            .read(profileProvider.notifier)
+            .updateAvatarStoragePath(null);
+        if (kDebugMode) print('PROFILE: avatar reset done');
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('기본 이미지 변경에 실패했습니다.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Widget _initialsWidget(String name) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    return Text(
-      initial,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 22,
-        fontWeight: FontWeight.w700,
+    return Container(
+      width: 60,
+      height: 60,
+      color: AppTheme.primaryColor,
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
