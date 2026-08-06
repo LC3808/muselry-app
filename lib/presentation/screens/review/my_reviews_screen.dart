@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/review.dart';
 import '../../../presentation/providers/review_provider.dart';
-import 'review_screen.dart' show ReviewFormSheet; // M7-G-6: 수정 시트 재사용 (ReviewFormSheet는 public)
 import 'review_edit_launcher.dart'; // v0.5.2: 공통 수정 launcher
 import '../../../config/router.dart';
 import '../../../domain/models/review_image.dart';
