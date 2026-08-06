@@ -1320,20 +1320,16 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
                         + (_imageService.isMaxReached(_totalImageCount) ? 0 : 1),
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      // 기존 사진
+                      // 기존 사진 (X 버튼 탭 → 즉시 UI에서 숨김, pendingDeleteIds에 추가)
                       if (index < _existingImages.length) {
                         final img = _existingImages[index];
-                        final isDeleting = _pendingDeleteIds.contains(img.id);
                         return _ExistingImageTile(
                           imageUrl: img.storagePath,
-                          isDeleting: isDeleting,
+                          isDeleting: false,
                           onToggleDelete: () {
                             setState(() {
-                              if (isDeleting) {
-                                _pendingDeleteIds.remove(img.id);
-                              } else {
-                                _pendingDeleteIds.add(img.id);
-                              }
+                              _pendingDeleteIds.add(img.id);
+                              _existingImages.remove(img);
                             });
                           },
                         );
