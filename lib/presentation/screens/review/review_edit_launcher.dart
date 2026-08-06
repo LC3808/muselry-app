@@ -14,7 +14,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
-import '../../data/repositories/review_image_repository.dart';
+import '../../../data/repositories/review_image_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -116,7 +116,7 @@ Future<void> showReviewEditSheet({
               // Storage 삭제 실패 (orphan)
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('리뷰는 수정됐지만 ${storageFailedCount}장의 사진 파일 정리에 실패했습니다.'),
+                  content: Text('리뷰는 수정됐지만 $storageFailedCount장의 사진 파일 정리에 실패했습니다.'),
                   duration: const Duration(seconds: 4),
                 ),
               );

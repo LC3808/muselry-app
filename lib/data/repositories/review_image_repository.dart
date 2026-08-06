@@ -235,12 +235,14 @@ class ReviewImageRepository {
           .list(path: folderPath);
 
       final stillExists = remainingFiles.any((file) => file.name == fileName);
-      print(
-        'REVIEW_EDIT: storage verify exists=$stillExists '
-        'path=$storagePath',
-      );
+      if (kDebugMode) {
+        print(
+          'REVIEW_EDIT: storage verify exists=$stillExists '
+          'path=$storagePath',
+        );
+      }
     } catch (e) {
-      print('REVIEW_EDIT: storage verify failed: $e');
+      if (kDebugMode) print('REVIEW_EDIT: storage verify failed: $e');
     }
   }
 
