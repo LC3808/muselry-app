@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/review_repository.dart';
 import '../../domain/models/review.dart';
+import '../../data/repositories/review_image_repository.dart';
+import '../../domain/models/review_image.dart';
 
 // ─── Repository Provider ────────────────────────────────────────────────────
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
@@ -266,4 +268,27 @@ class CommunityReviewsNotifier extends Notifier<CommunityReviewsState> {
 final communityReviewsProvider =
     NotifierProvider<CommunityReviewsNotifier, CommunityReviewsState>(
   () => CommunityReviewsNotifier(),
+);
+
+// ─── v0.5.1: 리뷰 사진 Provider ─────────────────────────────────────────────
+
+/// 특정 리뷰의 사진 목록 (display_order 오름차순)
+final reviewImagesProvider =
+    FutureProvider.family.autoDispose<List<ReviewImage>, String>(
+  (ref, reviewId) async {
+    final repo = ref.read(reviewImageRepositoryProvider);
+    return repo.loadImages(reviewId);
+  },
+);
+
+/// 여러 리뷰의 대표사진 일괄 조회 (커뮤니티/리뷰목록 카드용)
+/// key: reviewIds를 join(',')한 문자열
+final reviewThumbnailsProvider =
+    FutureProvider.family.autoDispose<Map<String, ReviewImage>, String>(
+  (ref, reviewIdsKey) async {
+    if (reviewIdsKey.isEmpty) return {};
+    final ids = reviewIdsKey.split(',');
+    final repo = ref.read(reviewImageRepositoryProvider);
+    return repo.loadThumbnails(ids);
+  },
 );

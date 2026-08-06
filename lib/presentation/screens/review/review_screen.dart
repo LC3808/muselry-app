@@ -14,6 +14,10 @@ import '../../../presentation/providers/comment_provider.dart';
 import '../../../presentation/providers/review_provider.dart';
 import '../../../presentation/providers/visit_provider.dart';
 import '../../widgets/common/user_avatar.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import '../../../data/repositories/review_image_repository.dart';
+import '../../../features/review/services/review_image_upload_service.dart';
 
 /// 박물관 리뷰 화면.
 /// museum_detail_screen.dart에서 Navigator.push로 열리거나
@@ -135,56 +139,62 @@ class ReviewScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ReviewFormSheet(
-        museumId: museumId,
-        visitId: visit.id,
-        visitedAt: visit.visitedAt,
-        onSubmit: (rating, content, visitedOn) async { // R27
-          try {
-            final newReview = await ref
-                .read(myReviewsProvider.notifier)
-                .createReview(
-                  museumId: museumId,
-                  visitId: visit.id,
-                  rating: rating,
-                  content: content,
-                  visitedOn: visitedOn,
+      builder: (sheetCtx) {
+        final sheetKey = GlobalKey<_ReviewFormSheetState>();
+        return ReviewFormSheet(
+          key: sheetKey,
+          museumId: museumId,
+          visitId: visit.id,
+          visitedAt: visit.visitedAt,
+          onSubmit: (rating, content, visitedOn) async { // R27
+            try {
+              final newReview = await ref
+                  .read(myReviewsProvider.notifier)
+                  .createReview(
+                    museumId: museumId,
+                    visitId: visit.id,
+                    rating: rating,
+                    content: content,
+                    visitedOn: visitedOn,
+                  );
+              // v0.5.1: 리뷰 저장 후 사진 업로드
+              await sheetKey.currentState?.uploadPendingImages(newReview.id);
+              if (context.mounted) {
+                Navigator.pop(context);
+                _showStatusSnackBar(context, newReview.status);
+              }
+              // v1.10: microtask로 invalidate (build 중 setState 방지)
+              Future.microtask(() {
+                ref
+                    .read(museumReviewsProvider(museumId).notifier)
+                    .addReview(newReview);
+                ref.invalidate(myReviewsForMuseumProvider(museumId));
+                ref.invalidate(myReviewForVisitProvider(visit.id));
+              });
+            } on AuthRequiredException {
+              if (context.mounted) _showLoginRequired(context);
+            } on PostgrestException catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('서버 오류: ${e.message}'),
+                    backgroundColor: AppTheme.errorColor,
+                  ),
                 );
-            if (context.mounted) {
-              Navigator.pop(context);
-              _showStatusSnackBar(context, newReview.status);
-            }
-            // v1.10: microtask로 invalidate (build 중 setState 방지)
-            Future.microtask(() {
-              ref
-                  .read(museumReviewsProvider(museumId).notifier)
-                  .addReview(newReview);
-              ref.invalidate(myReviewsForMuseumProvider(museumId));
-              ref.invalidate(myReviewForVisitProvider(visit.id));
-            });
-          } on AuthRequiredException {
-            if (context.mounted) _showLoginRequired(context);
-          } on PostgrestException catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('서버 오류: ${e.message}'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('오류가 발생했습니다: $e'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('오류가 발생했습니다: $e'),
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                );
             }
           }
         },
-      ),
+        );
+      },
     );
   }
 
@@ -273,6 +283,10 @@ class ReviewScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
+                // v0.5.1: 리뷰 사진 Storage 파일 먼저 삭제 (orphan 허용)
+                await ref
+                    .read(reviewImageRepositoryProvider)
+                    .deleteAllStorageFiles(review.id);
                 await ref
                     .read(myReviewsProvider.notifier)
                     .deleteReview(review.id);
@@ -953,6 +967,11 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
   static const int _minLength = 10;  // DB reviews_content_check 제약과 일치
   static const int _maxLength = 500; // DB reviews_content_check 제약과 일치
 
+  // v0.5.1: 사진 첨부
+  final List<File> _pendingImages = []; // 선택된 임시 파일 목록
+  bool _imageUploading = false;
+  late ReviewImageUploadService _imageService;
+
   @override
   void initState() {
     super.initState();
@@ -961,11 +980,19 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
         TextEditingController(text: widget.initialContent ?? '');
     // R27: 방문일 기본값 = 방문 기록의 visitedAt, 없으면 오늘
     _visitedOn = widget.visitedAt ?? DateTime.now();
+    // v0.5.1: 사진 서비스 초기화
+    final client = Supabase.instance.client;
+    final repo = ReviewImageRepository(client);
+    _imageService = ReviewImageUploadService(client, repo);
   }
 
   @override
   void dispose() {
     _contentController.dispose();
+    // 임시 파일 정리
+    for (final f in _pendingImages) {
+      try { f.deleteSync(); } catch (_) {}
+    }
     super.dispose();
   }
 
@@ -994,10 +1021,64 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
   });
   try {
     await widget.onSubmit(_rating, content, _visitedOn); // R27
+    // v0.5.1: 사진 업로드는 onSubmit에서 reviewId를 받아야 하므로
+    // onSubmit이 완료된 후 별도로 처리됨 (ReviewFormSheet는 reviewId를 모름)
+    // → onSubmitWithImages 콜백으로 처리 (아래 참조)
   } finally {
     if (mounted) setState(() => _isSubmitting = false);
   }
 }
+
+  /// v0.5.1: 사진 선택 (갤러리)
+  Future<void> _pickImage() async {
+    if (_imageService.isMaxReached(_pendingImages.length)) return;
+    setState(() => _imageUploading = true);
+    try {
+      final file = await _imageService.pickAndCompress();
+      if (file != null && mounted) {
+        setState(() => _pendingImages.add(file));
+      }
+    } on ReviewImageException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('사진 선택 중 오류가 발생했습니다: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _imageUploading = false);
+    }
+  }
+
+  /// v0.5.1: 선택된 사진 제거
+  void _removeImage(int index) {
+    setState(() {
+      try { _pendingImages[index].deleteSync(); } catch (_) {}
+      _pendingImages.removeAt(index);
+    });
+  }
+
+  /// v0.5.1: 리뷰 저장 후 사진 업로드 (review_id 획득 후 호출)
+  Future<void> uploadPendingImages(String reviewId) async {
+    if (_pendingImages.isEmpty) return;
+    for (int i = 0; i < _pendingImages.length; i++) {
+      try {
+        await _imageService.uploadAndInsert(
+          reviewId: reviewId,
+          file: _pendingImages[i],
+          displayOrder: i,
+        );
+      } catch (e) {
+        if (kDebugMode) print('REVIEW: image upload failed index=$i: $e');
+        // 개별 실패 허용 — 나머지 계속 진행
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1137,6 +1218,58 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
                 ),
               ),
               const SizedBox(height: 16),
+              // v0.5.1: 사진 첨부 섹션
+              if (!widget.isEdit) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '사진 첨부',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                    Text(
+                      '${_pendingImages.length}/${_imageService.maxImages}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_pendingImages.isNotEmpty)
+                  SizedBox(
+                    height: 90,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _pendingImages.length +
+                          (_imageService.isMaxReached(_pendingImages.length) ? 0 : 1),
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        if (index == _pendingImages.length) {
+                          return _AddPhotoButton(
+                            onTap: _imageUploading ? null : _pickImage,
+                            isLoading: _imageUploading,
+                          );
+                        }
+                        return _PendingImageTile(
+                          file: _pendingImages[index],
+                          onRemove: () => _removeImage(index),
+                        );
+                      },
+                    ),
+                  )
+                else
+                  _AddPhotoButton(
+                    onTap: _imageUploading ? null : _pickImage,
+                    isLoading: _imageUploading,
+                  ),
+                const SizedBox(height: 16),
+              ],
               // 제출 버튼
               SizedBox(
                 width: double.infinity,
@@ -1286,6 +1419,84 @@ class _ErrorState extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── v0.5.1: 사진 첨부 위젯 ─────────────────────────────────────────────────
+
+/// 사진 추가 버튼
+class _AddPhotoButton extends StatelessWidget {
+  final VoidCallback? onTap;
+  final bool isLoading;
+  const _AddPhotoButton({this.onTap, this.isLoading = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          border: Border.all(color: AppTheme.dividerColor),
+          borderRadius: BorderRadius.circular(8),
+          color: AppTheme.backgroundColor,
+        ),
+        child: isLoading
+            ? const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(
+                Icons.add_photo_alternate_outlined,
+                color: AppTheme.textSecondaryColor,
+                size: 28,
+              ),
+      ),
+    );
+  }
+}
+
+/// 선택된 임시 사진 썸네일 (삭제 버튼 포함)
+class _PendingImageTile extends StatelessWidget {
+  final File file;
+  final VoidCallback onRemove;
+  const _PendingImageTile({required this.file, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(
+            file,
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: 2,
+          right: 2,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

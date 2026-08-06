@@ -9,6 +9,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/comment_provider.dart';
 import '../../providers/review_provider.dart';
 import '../../widgets/common/user_avatar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/media/image_url_resolver.dart';
+import '../../../domain/models/review_image.dart';
 
 /// 단일 리뷰 상세 화면 (R5: 알림 딥링크 /reviews/:reviewId)
 ///
@@ -298,6 +301,9 @@ class _ReviewDetailBodyState extends ConsumerState<_ReviewDetailBody> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+                // ── v0.5.1: 사진 갤러리 ────────────────────────────────────
+                _ReviewPhotoGallery(reviewId: widget.review.id),
                 const SizedBox(height: 24),
 
                 // ── 박물관 이동 버튼 ────────────────────────────────────────
@@ -764,6 +770,152 @@ class _StarRow extends StatelessWidget {
           color: const Color(0xFFF5A623),
         );
       }),
+    );
+  }
+}
+
+// ─── v0.5.1: 리뷰 사진 갤러리 ─────────────────────────────────────────────────
+
+/// 리뷰 상세 사진 갤러리 (가로 스크롤 + 전체화면 확대)
+class _ReviewPhotoGallery extends ConsumerWidget {
+  final String reviewId;
+  const _ReviewPhotoGallery({required this.reviewId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final imagesAsync = ref.watch(reviewImagesProvider(reviewId));
+
+    return imagesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (images) {
+        if (images.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '사진 ${images.length}장',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondaryColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 180,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: images.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return GestureDetector(
+                    onTap: () => _showFullscreen(context, images, index),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: CachedNetworkImage(
+                          imageUrl: resolveImageUrl(images[index].storagePath),
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: AppTheme.dividerColor,
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            color: AppTheme.dividerColor,
+                            child: const Icon(Icons.broken_image_outlined,
+                                color: AppTheme.textSecondaryColor),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showFullscreen(
+      BuildContext context, List<ReviewImage> images, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _FullscreenGallery(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+}
+
+/// 전체화면 갤러리 (PageView + InteractiveViewer pinch zoom)
+class _FullscreenGallery extends StatefulWidget {
+  final List<ReviewImage> images;
+  final int initialIndex;
+  const _FullscreenGallery({required this.images, required this.initialIndex});
+
+  @override
+  State<_FullscreenGallery> createState() => _FullscreenGalleryState();
+}
+
+class _FullscreenGalleryState extends State<_FullscreenGallery> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(
+          '${_currentIndex + 1} / ${widget.images.length}',
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.images.length,
+        onPageChanged: (index) => setState(() => _currentIndex = index),
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Center(
+              child: CachedNetworkImage(
+                imageUrl: resolveImageUrl(widget.images[index].storagePath),
+                fit: BoxFit.contain,
+                placeholder: (_, __) => const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+                errorWidget: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image_outlined,
+                      color: Colors.white, size: 48),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

@@ -10,6 +10,9 @@ import '../../../domain/models/review.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/comment_provider.dart';
 import '../../providers/review_provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/media/image_url_resolver.dart';
+import '../../../domain/models/review_image.dart';
 import '../../widgets/common/user_avatar.dart';
 
 /// 커뮤니티 화면 (M5 업데이트)
@@ -118,6 +121,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     final reviewIdsKey = state.reviews.map((r) => r.id).join(',');
     final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
     final counts = countsAsync.valueOrNull ?? {};
+    // v0.5.1: 대표사진 일괄 조회
+    final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
+    final thumbnails = thumbnailsAsync.valueOrNull ?? {};
 
     return RefreshIndicator(
       onRefresh: () =>
@@ -136,6 +142,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             review: state.reviews[index],
             currentUserId: currentUserId,
             commentCount: counts[state.reviews[index].id],
+            thumbnail: thumbnails[state.reviews[index].id],
             onMuseumTap: (museumId) => context.push(
               AppRoutes.museumDetail.replaceFirst(':id', museumId),
             ),
@@ -152,6 +159,7 @@ class _ReviewFeedCard extends ConsumerStatefulWidget {
   final Review review;
   final String? currentUserId;
   final int? commentCount; // R12: 댓글 수 (일괄 조회 결과)
+  final ReviewImage? thumbnail; // v0.5.1: 대표사진
   final void Function(String museumId) onMuseumTap;
 
   const _ReviewFeedCard({
@@ -159,6 +167,7 @@ class _ReviewFeedCard extends ConsumerStatefulWidget {
     required this.review,
     required this.currentUserId,
     this.commentCount,
+    this.thumbnail,
     required this.onMuseumTap,
   });
 
@@ -306,6 +315,28 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
                       fontSize: 12,
                       color: AppTheme.accentColor,
                       fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                // v0.5.1: 대표사진 (16:9, 최대 180px)
+                if (widget.thumbnail != null) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: CachedNetworkImage(
+                        imageUrl: resolveImageUrl(widget.thumbnail!.storagePath),
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: AppTheme.dividerColor,
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: AppTheme.dividerColor,
+                          child: const Icon(Icons.broken_image_outlined,
+                              color: AppTheme.textSecondaryColor),
+                        ),
+                      ),
                     ),
                   ),
                 ],
