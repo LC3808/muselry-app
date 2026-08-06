@@ -158,10 +158,22 @@ class ReviewScreen extends ConsumerWidget {
                     visitedOn: visitedOn,
                   );
               // v0.5.1: 리뷰 저장 후 사진 업로드
-              await sheetKey.currentState?.uploadPendingImages(newReview.id);
+              final failedCount = await sheetKey.currentState
+                  ?.uploadPendingImages(newReview.id) ?? 0;
               if (context.mounted) {
                 Navigator.pop(context);
-                _showStatusSnackBar(context, newReview.status);
+                if (failedCount > 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '리뷰는 등록됐지만 $failedCount장의 사진을 올리지 못했습니다.',
+                      ),
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                } else {
+                  _showStatusSnackBar(context, newReview.status);
+                }
               }
               // v1.10: microtask로 invalidate (build 중 setState 방지)
               Future.microtask(() {
@@ -170,6 +182,9 @@ class ReviewScreen extends ConsumerWidget {
                     .addReview(newReview);
                 ref.invalidate(myReviewsForMuseumProvider(museumId));
                 ref.invalidate(myReviewForVisitProvider(visit.id));
+                // v0.5.1: 사진 provider 무효화
+                ref.invalidate(reviewImagesProvider(newReview.id));
+                ref.invalidate(communityReviewsProvider);
               });
             } on AuthRequiredException {
               if (context.mounted) _showLoginRequired(context);
@@ -283,19 +298,23 @@ class ReviewScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                // v0.5.1: 리뷰 사진 Storage 파일 먼저 삭제 (orphan 허용)
-                await ref
-                    .read(reviewImageRepositoryProvider)
-                    .deleteAllStorageFiles(review.id);
+                // v0.5.1: 원자성 보완 — Storage path 먼저 확보 후 리뷰 삭제
+                final imgRepo = ref.read(reviewImageRepositoryProvider);
+                final storagePaths = await imgRepo.loadStoragePaths(review.id);
+                // 리뷰 DB 삭제 (CASCADE로 review_images 행도 삭제됨)
                 await ref
                     .read(myReviewsProvider.notifier)
                     .deleteReview(review.id);
+                // 리뷰 삭제 성공 후 Storage 후처리 (실패 허용 — orphan)
+                await imgRepo.deleteStorageFilesByPaths(storagePaths);
                 ref
                     .read(museumReviewsProvider(museumId).notifier)
                     .removeReview(review.id);
                 ref.invalidate(myReviewsForMuseumProvider(museumId));
                 // v1.9 이슈 5: 삭제 후 해당 방문 리뷰 캐시도 무효화
                 ref.invalidate(myReviewForVisitProvider(review.visitId));
+                // v0.5.1: 사진 provider 무효화
+                ref.invalidate(communityReviewsProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('리뷰가 삭제되었습니다.')),
@@ -1064,8 +1083,10 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
   }
 
   /// v0.5.1: 리뷰 저장 후 사진 업로드 (review_id 획득 후 호출)
-  Future<void> uploadPendingImages(String reviewId) async {
-    if (_pendingImages.isEmpty) return;
+  /// v0.5.1: 사진 업로드 — 실패 건수 반환 (0 = 전체 성공)
+  Future<int> uploadPendingImages(String reviewId) async {
+    if (_pendingImages.isEmpty) return 0;
+    int failedCount = 0;
     for (int i = 0; i < _pendingImages.length; i++) {
       try {
         await _imageService.uploadAndInsert(
@@ -1075,9 +1096,10 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
         );
       } catch (e) {
         if (kDebugMode) print('REVIEW: image upload failed index=$i: $e');
-        // 개별 실패 허용 — 나머지 계속 진행
+        failedCount++;
       }
     }
+    return failedCount;
   }
 
   @override

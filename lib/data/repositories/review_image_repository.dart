@@ -80,19 +80,36 @@ class ReviewImageRepository {
     }
   }
 
-  /// 리뷰 삭제 시 해당 리뷰의 모든 사진 Storage 파일 삭제
-  /// (DB CASCADE는 DB 트리거가 처리, 여기서는 Storage만)
-  Future<void> deleteAllStorageFiles(String reviewId) async {
+  /// 리뷰 삭제 전 storage_path 목록을 메모리에 확보
+  /// (ON DELETE CASCADE로 review_images 행이 사라지기 전에 호출해야 함)
+  Future<List<String>> loadStoragePaths(String reviewId) async {
     try {
-      final images = await loadImages(reviewId);
-      if (images.isEmpty) return;
-      final paths = images.map((e) => e.storagePath).toList();
+      final response = await _client
+          .from('review_images')
+          .select('storage_path')
+          .eq('review_id', reviewId)
+          .eq('status', 'published');
+      return (response as List)
+          .map((e) => e['storage_path'] as String)
+          .toList();
+    } catch (e) {
+      if (kDebugMode) print('REVIEW: loadStoragePaths failed: $e');
+      return [];
+    }
+  }
+
+  /// 미리 확보한 paths 목록으로 Storage 파일 삭제 (orphan 허용)
+  /// 리뷰 DB 삭제 성공 후 호출
+  Future<void> deleteStorageFilesByPaths(List<String> paths) async {
+    if (paths.isEmpty) return;
+    try {
       await _client.storage.from(_bucket).remove(paths);
       if (kDebugMode) {
-        print('REVIEW: deleted ${paths.length} storage files for review=$reviewId');
+        print('REVIEW: deleted ${paths.length} storage files');
       }
     } catch (e) {
-      if (kDebugMode) print('REVIEW: deleteAllStorageFiles failed (orphan): $e');
+      // orphan 허용 — Storage 후처리 실패는 리뷰 삭제 성공에 영향 없음
+      if (kDebugMode) print('REVIEW: deleteStorageFilesByPaths failed (orphan): $e');
     }
   }
 
