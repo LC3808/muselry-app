@@ -52,13 +52,35 @@ class ReviewImageRepository {
   }
 
   /// 리뷰 사진 DB 삽입
+  /// Repository가 현재 세션 UID를 강제 주입 (클라이언트가 임의 UID 전달 불가)
   Future<ReviewImage> insertImage(ReviewImage image) async {
-    final response = await _client
-        .from('review_images')
-        .insert(image.toInsertJson())
-        .select()
-        .single();
-    return ReviewImage.fromJson(response);
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) {
+      throw StateError('로그인이 필요합니다.');
+    }
+
+    final payload = {
+      ...image.toInsertJson(),
+      'user_id': uid, // RLS: user_id = auth.uid() 요구
+    };
+
+    try {
+      final response = await _client
+          .from('review_images')
+          .insert(payload)
+          .select()
+          .single();
+      return ReviewImage.fromJson(response);
+    } catch (e) {
+      if (kDebugMode) {
+        print(
+          'REVIEW_IMAGE: db insert failed '
+          'code=${e is PostgrestException ? e.code : 'unknown'} '
+          'message=${e is PostgrestException ? e.message : e.runtimeType}',
+        );
+      }
+      rethrow;
+    }
   }
 
   /// 단일 사진 삭제 (DB soft delete + Storage 파일 삭제)

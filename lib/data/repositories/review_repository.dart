@@ -263,7 +263,7 @@ class ReviewRepository {
       .from('reviews')
       .select(
         'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, visited_on, '
-        'profiles!user_id(nickname, avatar_url), '
+        'profiles!user_id(nickname, avatar_url, avatar_storage_path), '
         'museums!museum_id(id, name, region_1, image_url)',
       )
       .eq('status', 'published')
