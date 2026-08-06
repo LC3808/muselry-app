@@ -69,8 +69,11 @@ class Review {
   /// 작성자 닉네임 (profiles 조인 시 채워짐)
   final String? authorNickname;
 
-  /// 작성자 아바타 URL (profiles 조인 시 채워짐)
+  /// 작성자 아바타 URL (profiles 조인 시 채워짐, OAuth 기본 이미지)
   final String? authorAvatarUrl;
+
+  /// v0.5.0: 작성자 아바타 Storage 경로 (1순위)
+  final String? authorAvatarStoragePath;
 
   const Review({
     required this.id,
@@ -85,6 +88,7 @@ class Review {
     this.museum,
     this.authorNickname,
     this.authorAvatarUrl,
+    this.authorAvatarStoragePath,
     this.visitedOn,
   });
 
@@ -107,6 +111,7 @@ class Review {
           : null,
       authorNickname: profiles?['nickname'] as String?,
       authorAvatarUrl: profiles?['avatar_url'] as String?,
+      authorAvatarStoragePath: profiles?['avatar_storage_path'] as String?,
       visitedOn: json['visited_on'] != null
           ? DateTime.tryParse(json['visited_on'] as String)
           : null,
@@ -152,6 +157,7 @@ class Review {
     Museum? museum,
     String? authorNickname,
     String? authorAvatarUrl,
+    String? authorAvatarStoragePath,
     DateTime? visitedOn,
   }) {
     return Review(
@@ -167,6 +173,8 @@ class Review {
       museum: museum ?? this.museum,
       authorNickname: authorNickname ?? this.authorNickname,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      authorAvatarStoragePath:
+          authorAvatarStoragePath ?? this.authorAvatarStoragePath,
       visitedOn: visitedOn ?? this.visitedOn,
     );
   }

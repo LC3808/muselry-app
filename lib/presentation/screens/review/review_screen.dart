@@ -13,6 +13,7 @@ import '../../../presentation/providers/auth_provider.dart';
 import '../../../presentation/providers/comment_provider.dart';
 import '../../../presentation/providers/review_provider.dart';
 import '../../../presentation/providers/visit_provider.dart';
+import '../../widgets/common/user_avatar.dart';
 
 /// 박물관 리뷰 화면.
 /// museum_detail_screen.dart에서 Navigator.push로 열리거나
@@ -738,9 +739,11 @@ class _ReviewCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _Avatar(
+                  UserAvatar(
+                    avatarStoragePath: review.authorAvatarStoragePath,
                     avatarUrl: review.authorAvatarUrl,
-                    nickname: review.authorNickname ?? '익명',
+                    displayName: review.authorNickname ?? '익명',
+                    radius: 18,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -881,37 +884,7 @@ class _ReviewCard extends StatelessWidget {
   }
 }
 
-// ─── 아바타 ────────────────────────────────────────────────────────────────
-
-class _Avatar extends StatelessWidget {
-  final String? avatarUrl;
-  final String nickname;
-
-  const _Avatar({this.avatarUrl, required this.nickname});
-
-  @override
-  Widget build(BuildContext context) {
-    if (avatarUrl != null && avatarUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 18,
-        backgroundImage: NetworkImage(avatarUrl!),
-        backgroundColor: AppTheme.dividerColor,
-      );
-    }
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: AppTheme.primaryColor,
-      child: Text(
-        nickname.isNotEmpty ? nickname[0].toUpperCase() : '?',
-        style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
+// _Avatar 제거됨 — UserAvatar 공통 위젯으로 교체 (v0.5.0)
 // ─── 별점 표시 ──────────────────────────────────────────────────────────────
 
 class _StarRow extends StatelessWidget {

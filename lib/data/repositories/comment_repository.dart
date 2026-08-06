@@ -26,7 +26,7 @@ class CommentRepository {
   Future<List<Comment>> fetchCommentsForReview(String reviewId) async {
     final response = await _client
         .from('comments')
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('review_id', reviewId)
         .eq('status', 'published')
         .order('created_at', ascending: true);
@@ -82,7 +82,7 @@ class CommentRepository {
           'content': content.trim(),
           'status': 'published',
         })
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .single();
     return Comment.fromJson(response);
   }
@@ -103,7 +103,7 @@ class CommentRepository {
           // updated_at은 DB 트리거(trg_comments_updated_at)가 자동 갱신
         })
         .eq('id', commentId)
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .single();
     return Comment.fromJson(response);
   }

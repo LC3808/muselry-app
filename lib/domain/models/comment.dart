@@ -40,8 +40,11 @@ class Comment {
   /// 작성자 닉네임 (profiles 조인 시 채워짐)
   final String? authorNickname;
 
-  /// 작성자 아바타 URL (profiles 조인 시 채워짐)
+  /// 작성자 아바타 URL (profiles 조인 시 채워짐, OAuth 기본 이미지)
   final String? authorAvatarUrl;
+
+  /// v0.5.0: 작성자 아바타 Storage 경로 (1순위)
+  final String? authorAvatarStoragePath;
 
   const Comment({
     required this.id,
@@ -53,6 +56,7 @@ class Comment {
     required this.updatedAt,
     this.authorNickname,
     this.authorAvatarUrl,
+    this.authorAvatarStoragePath,
   });
 
   factory Comment.fromJson(Map<String, dynamic> json) {
@@ -67,6 +71,7 @@ class Comment {
       updatedAt: DateTime.parse(json['updated_at'] as String),
       authorNickname: profiles?['nickname'] as String?,
       authorAvatarUrl: profiles?['avatar_url'] as String?,
+      authorAvatarStoragePath: profiles?['avatar_storage_path'] as String?,
     );
   }
 
@@ -80,6 +85,7 @@ class Comment {
     DateTime? updatedAt,
     String? authorNickname,
     String? authorAvatarUrl,
+    String? authorAvatarStoragePath,
   }) {
     return Comment(
       id: id ?? this.id,
@@ -91,6 +97,8 @@ class Comment {
       updatedAt: updatedAt ?? this.updatedAt,
       authorNickname: authorNickname ?? this.authorNickname,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      authorAvatarStoragePath:
+          authorAvatarStoragePath ?? this.authorAvatarStoragePath,
     );
   }
 

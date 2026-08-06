@@ -8,6 +8,7 @@ import '../../../domain/models/review.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/comment_provider.dart';
 import '../../providers/review_provider.dart';
+import '../../widgets/common/user_avatar.dart';
 
 /// 단일 리뷰 상세 화면 (R5: 알림 딥링크 /reviews/:reviewId)
 ///
@@ -246,15 +247,11 @@ class _ReviewDetailBodyState extends ConsumerState<_ReviewDetailBody> {
                 // ── 작성자 + 별점 ──────────────────────────────────────────
                 Row(
                   children: [
-                    CircleAvatar(
+                    UserAvatar(
+                      avatarStoragePath: widget.review.authorAvatarStoragePath,
+                      avatarUrl: widget.review.authorAvatarUrl,
+                      displayName: widget.review.authorNickname ?? '?',
                       radius: 20,
-                      backgroundColor: AppTheme.dividerColor,
-                      backgroundImage: widget.review.authorAvatarUrl != null
-                          ? NetworkImage(widget.review.authorAvatarUrl!)
-                          : null,
-                      child: widget.review.authorAvatarUrl == null
-                          ? Icon(Icons.person, size: 20, color: Colors.grey[400])
-                          : null,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -597,25 +594,11 @@ class _CommentItem extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
+              UserAvatar(
+                avatarStoragePath: comment.authorAvatarStoragePath,
+                avatarUrl: comment.authorAvatarUrl,
+                displayName: comment.authorNickname ?? '?',
                 radius: 12,
-                backgroundColor:
-                    AppTheme.primaryColor.withValues(alpha: 0.15),
-                backgroundImage: comment.authorAvatarUrl != null
-                    ? NetworkImage(comment.authorAvatarUrl!)
-                    : null,
-                child: comment.authorAvatarUrl == null
-                    ? Text(
-                        (comment.authorNickname ?? '?')
-                            .substring(0, 1)
-                            .toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primaryColor,
-                        ),
-                      )
-                    : null,
               ),
               const SizedBox(width: 8),
               Expanded(

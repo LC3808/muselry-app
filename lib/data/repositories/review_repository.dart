@@ -71,7 +71,7 @@ class ReviewRepository {
   Future<Review?> fetchReviewById(String reviewId) async {
     final response = await _client
         .from('reviews')
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('id', reviewId)
         .eq('status', 'published')
         .maybeSingle();
@@ -86,7 +86,7 @@ class ReviewRepository {
   }) async {
     final response = await _client
         .from('reviews')
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('museum_id', museumId)
         .eq('status', 'published')
         .order('created_at', ascending: false)
@@ -114,7 +114,7 @@ class ReviewRepository {
     if (uid == null) return [];
     final response = await _client
         .from('reviews')
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('user_id', uid)
         .eq('museum_id', museumId)
         .not('status', 'eq', 'removed')
@@ -128,7 +128,7 @@ class ReviewRepository {
     if (uid == null) return null;
     final response = await _client
         .from('reviews')
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('user_id', uid)
         .eq('visit_id', visitId)
         .not('status', 'eq', 'removed')
@@ -177,7 +177,7 @@ class ReviewRepository {
     final response = await _client
         .from('reviews')
         .insert(payload)
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .single();
     return Review.fromJson(response);
   }
@@ -212,7 +212,7 @@ class ReviewRepository {
         .from('reviews')
         .update(payload)
         .eq('id', reviewId)
-        .select('*, profiles(nickname, avatar_url)')
+        .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .single();
     return Review.fromJson(response);
   }

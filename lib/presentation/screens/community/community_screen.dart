@@ -10,6 +10,7 @@ import '../../../domain/models/review.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/comment_provider.dart';
 import '../../providers/review_provider.dart';
+import '../../widgets/common/user_avatar.dart';
 
 /// 커뮤니티 화면 (M5 업데이트)
 /// - 최신 리뷰 피드 + 댓글 CRUD
@@ -254,25 +255,11 @@ class _ReviewFeedCardState extends ConsumerState<_ReviewFeedCard> {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
+                    UserAvatar(
+                      avatarStoragePath: widget.review.authorAvatarStoragePath,
+                      avatarUrl: widget.review.authorAvatarUrl,
+                      displayName: widget.review.authorNickname ?? '?',
                       radius: 16,
-                      backgroundColor:
-                          AppTheme.primaryColor.withValues(alpha: 0.15),
-                      backgroundImage: widget.review.authorAvatarUrl != null
-                          ? NetworkImage(widget.review.authorAvatarUrl!)
-                          : null,
-                      child: widget.review.authorAvatarUrl == null
-                          ? Text(
-                              (widget.review.authorNickname ?? '?')
-                                  .substring(0, 1)
-                                  .toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.primaryColor,
-                              ),
-                            )
-                          : null,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -655,24 +642,11 @@ class _CommentItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
+          UserAvatar(
+            avatarStoragePath: comment.authorAvatarStoragePath,
+            avatarUrl: comment.authorAvatarUrl,
+            displayName: comment.authorNickname ?? '?',
             radius: 13,
-            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
-            backgroundImage: comment.authorAvatarUrl != null
-                ? NetworkImage(comment.authorAvatarUrl!)
-                : null,
-            child: comment.authorAvatarUrl == null
-                ? Text(
-                    (comment.authorNickname ?? '?')
-                        .substring(0, 1)
-                        .toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryColor,
-                    ),
-                  )
-                : null,
           ),
           const SizedBox(width: 8),
           Expanded(

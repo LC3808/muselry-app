@@ -15,7 +15,7 @@ import '../../providers/comment_provider.dart'; // unreadNotificationCountProvid
 import '../../providers/bookmark_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/visit_provider.dart';
-
+import '../../providers/review_provider.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // MypageScreen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -361,6 +361,9 @@ class _TappableAvatarWidgetState
         await ref
             .read(profileProvider.notifier)
             .updateAvatarStoragePath(newPath);
+        // 리븷/댓글 화면 즉시 반영
+        ref.invalidate(communityReviewsProvider);
+        ref.invalidate(myReviewsProvider);
         if (kDebugMode) print('PROFILE: avatar upload success');
       }
     } on AvatarUploadException catch (e) {
@@ -390,6 +393,9 @@ class _TappableAvatarWidgetState
         await ref
             .read(profileProvider.notifier)
             .updateAvatarStoragePath(null);
+        // 리븷/댓글 화면 즉시 반영
+        ref.invalidate(communityReviewsProvider);
+        ref.invalidate(myReviewsProvider);
         if (kDebugMode) print('PROFILE: avatar reset done');
       } else {
         if (mounted) {
