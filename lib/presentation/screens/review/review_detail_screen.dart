@@ -882,11 +882,11 @@ class _ReviewPhotoGallery extends ConsumerWidget {
                     onTap: () => _showFullscreen(context, images, index),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: AspectRatio(
-                        aspectRatio: 1,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 320),
                         child: CachedNetworkImage(
                           imageUrl: resolveImageUrl(images[index].storagePath),
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           placeholder: (_, __) => Container(
                             color: AppTheme.dividerColor,
                           ),

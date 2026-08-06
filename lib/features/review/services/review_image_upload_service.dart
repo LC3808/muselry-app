@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,20 +11,21 @@ import 'package:uuid/uuid.dart';
 import '../../../data/repositories/review_image_repository.dart';
 import '../../../domain/models/review_image.dart';
 
-/// 리뷰 사진 업로드 서비스 (v0.5.1 핫픽스)
+/// 리뷰 사진 업로드 서비스 (v0.5.2: crop 단계 제거)
 ///
 /// 처리 순서:
 ///   ① image_picker 갤러리 선택
-///   ② crop (자유 비율)
-///   ③ 1280px 이하 resize + WebP 품질80 (실패 시 JPEG 폴백) + keepExif:false
-///   ④ Storage 업로드 (upsert=false)
-///   ⑤ review_images DB insert
+///   ② 긴 변 최대 1280px 축소 + WebP 품질80 (실패 시 JPEG 품질82 폴백) + keepExif:false
+///      - 원본 비율 유지 (강제 정사각형 변환 금지)
+///      - 작은 이미지 확대 금지
+///   ③ Storage 업로드 (upsert=false)
+///   ④ review_images DB insert
 ///
 /// 금지:
+///   - crop 단계 없음 (원본 비율 유지)
 ///   - Storage overwrite 금지 (upsert=false)
 ///   - review 테이블에 URL 저장 금지
 ///   - service_role 사용 금지
-///   - 크래시를 catch만 하고 원인 숨기기 금지
 class ReviewImageUploadService {
   final SupabaseClient _client;
   final ReviewImageRepository _repo;
@@ -33,11 +33,11 @@ class ReviewImageUploadService {
   final _uuid = const Uuid();
   static const String _bucket = 'media';
   static const int _maxImages = 5;
-  static const int _maxLongEdge = 1280; // B: 구형 기기 메모리 보수화
+  static const int _maxLongEdge = 1280;
 
   ReviewImageUploadService(this._client, this._repo);
 
-  /// 갤러리에서 사진 1장 선택 → crop → compress → 임시 File 반환
+  /// 갤러리에서 사진 1장 선택 → compress → 임시 File 반환
   ///
   /// 반환: 압축된 임시 File (null = 사용자 취소)
   /// 예외: ReviewImageException (사용자 문구 포함)
@@ -48,7 +48,7 @@ class ReviewImageUploadService {
       if (kDebugMode) print('REVIEW_IMAGE: picker start');
       picked = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 90,
+        imageQuality: 95, // 원본 품질 최대한 유지 (compress에서 최종 처리)
       );
       if (picked == null) {
         if (kDebugMode) print('REVIEW_IMAGE: picker cancelled');
@@ -63,32 +63,10 @@ class ReviewImageUploadService {
       throw ReviewImageException('이미지를 처리하지 못했습니다. 다른 사진으로 다시 시도해 주세요.');
     }
 
-    // ② crop (자유 비율)
-    CroppedFile? cropped;
-    try {
-      if (kDebugMode) print('REVIEW_IMAGE: crop start');
-      cropped = await ImageCropper().cropImage(
-        sourcePath: picked.path,
-        compressFormat: ImageCompressFormat.jpg,
-        compressQuality: 90,
-      );
-      if (cropped == null) {
-        if (kDebugMode) print('REVIEW_IMAGE: crop cancelled');
-        return null;
-      }
-      if (kDebugMode) print('REVIEW_IMAGE: crop success');
-    } on PlatformException catch (e) {
-      if (kDebugMode) print('REVIEW_IMAGE: crop PlatformException: $e');
-      throw ReviewImageException('이미지를 처리하지 못했습니다. 다른 사진으로 다시 시도해 주세요.');
-    } catch (e) {
-      if (kDebugMode) print('REVIEW_IMAGE: crop error: $e');
-      throw ReviewImageException('이미지를 처리하지 못했습니다. 다른 사진으로 다시 시도해 주세요.');
-    }
-
-    // ③ compress (1280px 이하, WebP 우선, JPEG 폴백)
+    // ② compress (원본 비율 유지, 긴 변 최대 1280px, WebP 우선, JPEG 폴백)
     try {
       if (kDebugMode) print('REVIEW_IMAGE: compress start');
-      final File compressed = await _compress(cropped.path);
+      final File compressed = await _compress(picked.path);
       final bytes = await compressed.length();
       if (kDebugMode) print('REVIEW_IMAGE: compress success bytes=$bytes');
       return compressed;
@@ -121,7 +99,7 @@ class ReviewImageUploadService {
     final fileName = '${_uuid.v4()}.$ext';
     final storagePath = 'reviews/$uid/$reviewId/$fileName';
 
-    // ④ Storage 업로드
+    // ③ Storage 업로드
     try {
       if (kDebugMode) print('REVIEW_IMAGE: storage upload start');
       await _client.storage
@@ -140,7 +118,7 @@ class ReviewImageUploadService {
       throw ReviewImageException('사진 업로드에 실패했습니다. 다시 시도해 주세요.');
     }
 
-    // ⑤ review_images DB insert
+    // ④ review_images DB insert
     try {
       if (kDebugMode) print('REVIEW_IMAGE: db insert start');
       final stat = await file.stat();
@@ -178,12 +156,13 @@ class ReviewImageUploadService {
     return uid;
   }
 
-  /// B: 이미지 압축
-  ///   - 긴 변이 _maxLongEdge(1280) 초과 → 축소
-  ///   - 긴 변이 _maxLongEdge 이하 → 원본 크기 유지 (확대 금지)
-  ///   - WebP 1차 시도, PlatformException/null → JPEG 폴백
+  /// 이미지 압축 (원본 비율 유지)
   ///
-  /// 반환: (File, isJpeg)
+  /// flutter_image_compress의 minWidth/minHeight는 "최소 크기"가 아닌
+  /// "긴 변 기준 최대 크기" 역할을 합니다 (비율 유지).
+  /// 원본이 이미 1280px 이하이면 확대하지 않습니다.
+  ///
+  /// WebP 1차 시도, PlatformException/null → JPEG 폴백
   Future<File> _compress(String sourcePath) async {
     final dir = await getTemporaryDirectory();
 
