@@ -846,14 +846,33 @@ class _StarRow extends StatelessWidget {
 // ─── v0.5.1: 리뷰 사진 갤러리 ─────────────────────────────────────────────────
 
 /// 리뷰 상세 사진 갤러리 (가로 스크롤 + 전체화면 확대)
-class _ReviewPhotoGallery extends ConsumerWidget {
+class _ReviewPhotoGallery extends ConsumerStatefulWidget {
   final String reviewId;
   const _ReviewPhotoGallery({required this.reviewId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final imagesAsync = ref.watch(reviewImagesProvider(reviewId));
+  ConsumerState<_ReviewPhotoGallery> createState() => _ReviewPhotoGalleryState();
+}
 
+class _ReviewPhotoGalleryState extends ConsumerState<_ReviewPhotoGallery> {
+  int _currentIndex = 0;
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imagesAsync = ref.watch(reviewImagesProvider(widget.reviewId));
     return imagesAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
@@ -862,39 +881,51 @@ class _ReviewPhotoGallery extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '사진 ${images.length}장',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondaryColor,
-              ),
+            // 헤더: "사진 N장" + 페이지 인디케이터
+            Row(
+              children: [
+                Text(
+                  '사진 ${images.length}장',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+                const Spacer(),
+                if (images.length > 1)
+                  Text(
+                    '${_currentIndex + 1} / ${images.length}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              height: 180,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
+            // 4:3 PageView 갤러리 (미리보기: BoxFit.cover, 균일한 프레임)
+            AspectRatio(
+              aspectRatio: 4 / 3,
+              child: PageView.builder(
+                controller: _pageController,
                 itemCount: images.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                onPageChanged: (i) => setState(() => _currentIndex = i),
                 itemBuilder: (context, index) {
                   return GestureDetector(
                     onTap: () => _showFullscreen(context, images, index),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 320),
-                        child: CachedNetworkImage(
-                          imageUrl: resolveImageUrl(images[index].storagePath),
-                          fit: BoxFit.contain,
-                          placeholder: (_, __) => Container(
-                            color: AppTheme.dividerColor,
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            color: AppTheme.dividerColor,
-                            child: const Icon(Icons.broken_image_outlined,
-                                color: AppTheme.textSecondaryColor),
-                          ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: CachedNetworkImage(
+                        imageUrl: resolveImageUrl(images[index].storagePath),
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: AppTheme.dividerColor,
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: AppTheme.dividerColor,
+                          child: const Icon(Icons.broken_image_outlined,
+                              color: AppTheme.textSecondaryColor),
                         ),
                       ),
                     ),
@@ -902,6 +933,28 @@ class _ReviewPhotoGallery extends ConsumerWidget {
                 },
               ),
             ),
+            // 점 인디케이터 (2장 이상일 때)
+            if (images.length > 1) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(images.length, (i) {
+                  final active = i == _currentIndex;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: active ? 16 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: active
+                          ? AppTheme.primaryColor
+                          : AppTheme.dividerColor,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  );
+                }),
+              ),
+            ],
           ],
         );
       },
@@ -921,6 +974,7 @@ class _ReviewPhotoGallery extends ConsumerWidget {
     );
   }
 }
+
 
 /// 전체화면 갤러리 (PageView + InteractiveViewer pinch zoom)
 class _FullscreenGallery extends StatefulWidget {
