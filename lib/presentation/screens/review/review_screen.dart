@@ -964,7 +964,7 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
   // v0.5.1/v0.5.2: 사진 첨부
   final List<File> _pendingImages = []; // 신규 선택 임시 파일
   List<ReviewImage> _existingImages = []; // 수정 모드: 기존 published 사진
-  final Set<String> _pendingDeleteIds = {}; // 수정 모드: 삭제 예약 imageId
+  final Map<String, ReviewImage> _pendingDeleteImages = {}; // 수정 모드: 삭제 예약 {imageId: ReviewImage}
   bool _imageUploading = false;
   late ReviewImageUploadService _imageService;
   late ReviewImageRepository _imageRepo;
@@ -1006,7 +1006,10 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
 
   /// v0.5.2: 총 사진 수 (기존 - 삭제예약 + 신규)
   int get _totalImageCount =>
-      (_existingImages.length - _pendingDeleteIds.length) + _pendingImages.length;
+      (_existingImages.length - _pendingDeleteImages.length) + _pendingImages.length;
+
+  List<ReviewImage> get _visibleExistingImages =>
+      _existingImages.where((img) => !_pendingDeleteImages.containsKey(img.id)).toList();
 
   @override
   void dispose() {
@@ -1092,8 +1095,9 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
   Future<int> uploadPendingImages(String reviewId) async {
     if (_pendingImages.isEmpty) return 0;
     // 수정 모드: 삭제 예약 제외한 기존 사진 수 이후부터 order 시작
+    final visibleCount = _existingImages.length - _pendingDeleteImages.length;
     final baseOrder = widget.isEdit
-        ? (_existingImages.length - _pendingDeleteIds.length)
+        ? visibleCount
         : 0;
     int failedCount = 0;
     for (int i = 0; i < _pendingImages.length; i++) {
@@ -1116,36 +1120,35 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
   /// v0.5.2: 삭제 예약된 기존 사진 처리 (DB soft delete → Storage 삭제)
   Future<void> applyPendingDeletes() async {
     if (widget.reviewId == null) return;
-    for (final img in _existingImages) {
-      if (!_pendingDeleteIds.contains(img.id)) continue;
+    // 삭제 예약 목록 기준으로 DB soft delete + Storage 삭제
+    for (final img in _pendingDeleteImages.values) {
       try {
         await _imageRepo.softDeleteImageRow(img.id);
-        if (kDebugMode) print('REVIEW_EDIT: image row removed id=${img.id}');
+        if (kDebugMode) print('REVIEW_EDIT: image row removed id=\${img.id}');
         await _imageRepo.deleteStorageFile(img.storagePath);
       } catch (e) {
-        if (kDebugMode) print('REVIEW_EDIT: softDelete failed id=${img.id}: $e');
+        if (kDebugMode) print('REVIEW_EDIT: softDelete failed id=\${img.id}: \$e');
       }
     }
-    // display_order 재정렬
+    // 남은 published 사진 재조회 후 display_order 0부터 재정렬
     final remaining = _existingImages
-        .where((img) => !_pendingDeleteIds.contains(img.id))
+        .where((img) => !_pendingDeleteImages.containsKey(img.id))
         .toList();
     if (remaining.isNotEmpty) {
       await _imageRepo.reorderImages(remaining.map((img) => img.id).toList());
     }
-    // 삭제 완료 후 _existingImages를 DB 재조회 결과로 교체
-    // → 같은 BottomSheet를 다시 열어도 삭제된 사진이 표시되지 않음
+    // _existingImages를 DB 재조회 결과로 교체 (BottomSheet 재진입 시 일관성 보장)
     try {
       final refreshed = await _imageRepo.loadImages(widget.reviewId!);
       if (mounted) {
         setState(() {
           _existingImages = refreshed;
-          _pendingDeleteIds.clear();
+          _pendingDeleteImages.clear();
         });
       }
-      if (kDebugMode) print('REVIEW_EDIT: existingImages refreshed count=${refreshed.length}');
+      if (kDebugMode) print('REVIEW_EDIT: existingImages refreshed count=\${refreshed.length}');
     } catch (e) {
-      if (kDebugMode) print('REVIEW_EDIT: existingImages refresh failed: $e');
+      if (kDebugMode) print('REVIEW_EDIT: existingImages refresh failed: \$e');
     }
   }
 
@@ -1315,27 +1318,43 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
                   height: 90,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _existingImages.length
+                    itemCount: _visibleExistingImages.length
                         + _pendingImages.length
                         + (_imageService.isMaxReached(_totalImageCount) ? 0 : 1),
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      // 기존 사진 (X 버튼 탭 → 즉시 UI에서 숨김, pendingDeleteIds에 추가)
-                      if (index < _existingImages.length) {
-                        final img = _existingImages[index];
+                      // 기존 사진 (X 버튼 탭 → 즉시 UI에서 숨김 + Snackbar 되돌리기)
+                      if (index < _visibleExistingImages.length) {
+                        final img = _visibleExistingImages[index];
                         return _ExistingImageTile(
                           imageUrl: img.storagePath,
                           isDeleting: false,
                           onToggleDelete: () {
                             setState(() {
-                              _pendingDeleteIds.add(img.id);
-                              _existingImages.remove(img);
+                              _pendingDeleteImages[img.id] = img;
                             });
+                            // Snackbar 되돌리기
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  content: const Text('사진이 삭제 예약되었습니다.'),
+                                  duration: const Duration(seconds: 3),
+                                  action: SnackBarAction(
+                                    label: '되돌리기',
+                                    onPressed: () {
+                                      setState(() {
+                                        _pendingDeleteImages.remove(img.id);
+                                      });
+                                    },
+                                  ),
+                                ),
+                              );
                           },
                         );
                       }
                       // 신규 사진
-                      final pendingIndex = index - _existingImages.length;
+                      final pendingIndex = index - _visibleExistingImages.length;
                       if (pendingIndex < _pendingImages.length) {
                         return _PendingImageTile(
                           file: _pendingImages[pendingIndex],
