@@ -85,9 +85,11 @@ Future<void> showReviewEditSheet({
             debugPrint('REVIEW_EDIT: completed failedUploads=$failedCount');
           }
 
-          // 7. provider invalidate (microtask: build 중 setState 방지)
+          // 7. provider 재조회 (invalidate + 즉시 refresh)
+          // invalidate만으로는 watch 구독자가 rebuild될 때까지 지연될 수 있어
+          // ref.refresh로 즉시 재조회 트리거
           Future.microtask(() {
-            ref.invalidate(reviewImagesProvider(review.id));
+            ref.refresh(reviewImagesProvider(review.id));
             ref.invalidate(communityReviewsProvider);
             ref.invalidate(museumReviewsProvider(review.museumId));
             ref.invalidate(myReviewsForMuseumProvider(review.museumId));

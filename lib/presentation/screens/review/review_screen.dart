@@ -1115,6 +1115,7 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
 
   /// v0.5.2: 삭제 예약된 기존 사진 처리 (DB soft delete → Storage 삭제)
   Future<void> applyPendingDeletes() async {
+    if (widget.reviewId == null) return;
     for (final img in _existingImages) {
       if (!_pendingDeleteIds.contains(img.id)) continue;
       try {
@@ -1131,6 +1132,20 @@ class ReviewFormSheetState extends State<ReviewFormSheet> {
         .toList();
     if (remaining.isNotEmpty) {
       await _imageRepo.reorderImages(remaining.map((img) => img.id).toList());
+    }
+    // 삭제 완료 후 _existingImages를 DB 재조회 결과로 교체
+    // → 같은 BottomSheet를 다시 열어도 삭제된 사진이 표시되지 않음
+    try {
+      final refreshed = await _imageRepo.loadImages(widget.reviewId!);
+      if (mounted) {
+        setState(() {
+          _existingImages = refreshed;
+          _pendingDeleteIds.clear();
+        });
+      }
+      if (kDebugMode) print('REVIEW_EDIT: existingImages refreshed count=${refreshed.length}');
+    } catch (e) {
+      if (kDebugMode) print('REVIEW_EDIT: existingImages refresh failed: $e');
     }
   }
 
