@@ -12,6 +12,7 @@ import '../../widgets/common/user_avatar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/media/image_url_resolver.dart';
 import '../../../domain/models/review_image.dart';
+import 'review_edit_launcher.dart'; // v0.5.2: 공통 수정 launcher
 
 /// 단일 리뷰 상세 화면 (R5: 알림 딥링크 /reviews/:reviewId)
 ///
@@ -31,55 +32,123 @@ class ReviewDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reviewAsync = ref.watch(_reviewByIdProvider(reviewId));
 
+    final currentUser = ref.watch(currentUserProvider);
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('리뷰'),
-      ),
       body: reviewAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey[300]),
-              const SizedBox(height: 12),
-              Text(
-                '리뷰를 불러오지 못했어요.',
-                style: TextStyle(color: AppTheme.textSecondaryColor),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => ref.invalidate(_reviewByIdProvider(reviewId)),
-                child: const Text('다시 시도'),
-              ),
-            ],
+        loading: () => Scaffold(
+          appBar: AppBar(title: const Text('리뷰')),
+          body: const Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, _) => Scaffold(
+          appBar: AppBar(title: const Text('리뷰')),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Colors.grey[300]),
+                const SizedBox(height: 12),
+                Text(
+                  '리뷰를 불러오지 못했어요.',
+                  style: TextStyle(color: AppTheme.textSecondaryColor),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => ref.invalidate(_reviewByIdProvider(reviewId)),
+                  child: const Text('다시 시도'),
+                ),
+              ],
+            ),
           ),
         ),
         data: (review) {
           if (review == null) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
-                  const SizedBox(height: 12),
-                  Text(
-                    '리뷰를 찾을 수 없어요.',
-                    style: TextStyle(color: AppTheme.textSecondaryColor),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => context.pop(),
-                    child: const Text('돌아가기'),
-                  ),
-                ],
+            return Scaffold(
+              appBar: AppBar(title: const Text('리뷰')),
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
+                    const SizedBox(height: 12),
+                    Text(
+                      '리뷰를 찾을 수 없어요.',
+                      style: TextStyle(color: AppTheme.textSecondaryColor),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => context.pop(),
+                      child: const Text('돌아가기'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
-          return _ReviewDetailBody(
-            review: review,
-            highlightCommentId: highlightCommentId,
+          // v0.5.2: 본인 리뷰 여부 확인
+          final isOwner = currentUser?.id == review.userId;
+          return Scaffold(
+            backgroundColor: AppTheme.backgroundColor,
+            appBar: AppBar(
+              title: const Text('리뷰'),
+              actions: [
+                // v0.5.2: 본인 리뷰 + 수정 기간 내 → 수정 버튼
+                if (isOwner && review.isEditable)
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: '리뷰 수정',
+                    onPressed: () => showReviewEditSheet(
+                      context: context,
+                      ref: ref,
+                      review: review,
+                    ),
+                  ),
+                // v0.5.2: 본인 리뷰 → 삭제 메뉴
+                if (isOwner)
+                  PopupMenuButton<String>(
+                    onSelected: (v) async {
+                      if (v == 'delete') {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('리뷰 삭제'),
+                            content: const Text('이 리뷰를 삭제하시겠습니까?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('취소'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: AppTheme.errorColor),
+                                child: const Text('삭제'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true && context.mounted) {
+                          await ref
+                              .read(myReviewsProvider.notifier)
+                              .deleteReview(review.id);
+                          if (context.mounted) context.pop();
+                        }
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text('삭제',
+                            style: TextStyle(color: AppTheme.errorColor)),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            body: _ReviewDetailBody(
+              review: review,
+              highlightCommentId: highlightCommentId,
+            ),
           );
         },
       ),

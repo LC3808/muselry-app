@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/review.dart';
 import '../../../presentation/providers/review_provider.dart';
 import 'review_screen.dart' show ReviewFormSheet; // M7-G-6: 수정 시트 재사용 (ReviewFormSheet는 public)
+import 'review_edit_launcher.dart'; // v0.5.2: 공통 수정 launcher
 import '../../../config/router.dart';
 import '../../../domain/models/review_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -90,7 +91,11 @@ class MyReviewsScreen extends ConsumerWidget {
                   onTapMuseum: () =>
                       context.push('/museum/${review.museumId}'),
                   onEdit: review.isEditable
-                      ? () => _showEditSheet(context, ref, review)
+                      ? () => showReviewEditSheet(
+                            context: context,
+                            ref: ref,
+                            review: review,
+                          )
                       : null,
                   onDelete: () =>
                       _showDeleteDialog(context, ref, review),
@@ -103,76 +108,6 @@ class MyReviewsScreen extends ConsumerWidget {
     );
   }
 
-  // ── M7-G-6: 즉석 수정 시트 (_ReviewFormSheet 재사용) ─────────────────────
-  void _showEditSheet(BuildContext context, WidgetRef ref, Review review) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ReviewFormSheet(
-        museumId: review.museumId,
-        visitId: review.visitId,
-        isEdit: true,
-        initialRating: review.rating,
-        initialContent: review.content,
-        // R27: 방문일 기존값 프리필 (visitedOn 없으면 createdAt 기준)
-        visitedAt: review.visitedOn ?? review.createdAt,
-        onSubmit: (rating, content, visitedOn) async {
-          try {
-            final updated = await ref
-                .read(myReviewsProvider.notifier)
-                .updateReview(
-                  reviewId: review.id,
-                  rating: rating,
-                  content: content,
-                  visitedOn: visitedOn,
-                );
-            if (context.mounted) {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    updated.status == ReviewStatus.pendingReview
-                        ? '수정 완료 — 검토 후 게시됩니다.'
-                        : '리뷰가 수정되었습니다.',
-                  ),
-                ),
-              );
-            }
-            // M7-G-6: 수정 완료 후 관련 provider invalidate
-            // - myReviewsProvider: notifier.updateReview()에서 이미 로컬 갱신됨
-            // - myReviewsForMuseumProvider: 해당 박물관 내 리뷰 캐시 무효화
-            // - myReviewForVisitProvider: 방문별 리뷰 캐시 무효화
-            // - museumReviewsProvider: 박물관 리뷰 목록 캐시 무효화
-            // - communityReviewsProvider: 커뮤니티 피드는 별도 로드 시 갱신됨
-            Future.microtask(() {
-              ref.invalidate(myReviewsForMuseumProvider(review.museumId));
-              ref.invalidate(myReviewForVisitProvider(updated.visitId));
-              ref.invalidate(museumReviewsProvider(review.museumId));
-            });
-          } on PostgrestException catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('서버 오류: ${e.message}'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('수정 중 오류가 발생했습니다: $e'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
-          }
-        },
-      ),
-    );
-  }
 
   // ── 삭제 확인 다이얼로그 ──────────────────────────────────────────────────
   void _showDeleteDialog(
@@ -250,12 +185,12 @@ class _MyReviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // M7-G-6: 카드 본문(시설명 포함)은 박물관 페이지로 이동 (동선 분리)
+          // v0.5.2: 박물관 헤더 탭 → 박물관 상세
           InkWell(
             onTap: onTapMuseum,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -290,7 +225,19 @@ class _MyReviewCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+
+                ],
+              ),
+            ),
+          ),
+          // v0.5.2: 리뷰 본문 탭 → 리뷰 상세
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   // 별점
                   Row(
                     children: [
@@ -365,6 +312,7 @@ class _MyReviewCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                 ],
+
               ),
             ),
           ),

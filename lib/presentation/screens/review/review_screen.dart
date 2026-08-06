@@ -21,6 +21,7 @@ import '../../../domain/models/review_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/media/image_url_resolver.dart';
 import '../../../features/review/services/review_image_upload_service.dart';
+import 'review_edit_launcher.dart';
 
 /// 박물관 리뷰 화면.
 /// museum_detail_screen.dart에서 Navigator.push로 열리거나
@@ -98,7 +99,7 @@ class ReviewScreen extends ConsumerWidget {
                     AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
                   ),
                   onEdit: isMyReview
-                      ? () => _showEditBottomSheet(context, ref, review)
+                      ? () => showReviewEditSheet(context: context, ref: ref, review: review)
                       : null,
                   onDelete: isMyReview
                       ? () => _showDeleteDialog(context, ref, review)
@@ -143,7 +144,7 @@ class ReviewScreen extends ConsumerWidget {
   void _showWriteBottomSheet(BuildContext context, WidgetRef ref,
       {required Visit visit}) {
     // A: GlobalKey를 builder 밖에서 한 번만 생성 — builder 재실행 시 State 교체 방지
-    final sheetKey = GlobalKey<_ReviewFormSheetState>();
+    final sheetKey = GlobalKey<ReviewFormSheetState>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -223,88 +224,6 @@ class ReviewScreen extends ConsumerWidget {
 
   // ── 리뷰 수정 BottomSheet ────────────────────────────────────────────────
 
-  void _showEditBottomSheet(
-      BuildContext context, WidgetRef ref, Review review) {
-    if (!review.isEditable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('작성 후 7일이 지나 수정할 수 없습니다.')),
-      );
-      return;
-    }
-    // v0.5.2: GlobalKey builder 밖에서 생성 + reviewId 전달
-    final editSheetKey = GlobalKey<_ReviewFormSheetState>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ReviewFormSheet(
-        key: editSheetKey,
-        museumId: museumId,
-        visitId: review.visitId,
-        reviewId: review.id, // v0.5.2: 기존 사진 로드
-        isEdit: true,
-        initialRating: review.rating,
-        initialContent: review.content,
-        onSubmit: (rating, content, visitedOn) async { // R27
-          try {
-            final updated = await ref
-                .read(myReviewsProvider.notifier)
-                .updateReview(
-                  reviewId: review.id,
-                  rating: rating,
-                  content: content,
-                  visitedOn: visitedOn,
-                );
-            // v0.5.2: 삭제 예약 처리 + 신규 사진 업로드
-            await editSheetKey.currentState?.applyPendingDeletes();
-            final failedCount = await editSheetKey.currentState
-                ?.uploadPendingImages(review.id) ?? 0;
-            if (context.mounted) {
-              Navigator.pop(context);
-              if (failedCount > 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('수정됐지만 $failedCount장의 사진을 올리지 못했습니다.'),
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
-              } else {
-                _showStatusSnackBar(context, updated.status);
-              }
-            }
-            // v1.10: microtask로 invalidate (build 중 setState 방지)
-            Future.microtask(() {
-              ref
-                  .read(museumReviewsProvider(museumId).notifier)
-                  .updateReview(updated);
-              ref.invalidate(myReviewsForMuseumProvider(museumId));
-              ref.invalidate(myReviewForVisitProvider(updated.visitId));
-              ref.invalidate(reviewImagesProvider(review.id));
-              ref.invalidate(communityReviewsProvider);
-            });
-          } on PostgrestException catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('서버 오류: ${e.message}'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('수정 중 오류가 발생했습니다: $e'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
-          }
-        },
-      ),
-    );
-  }
 
   // ── 삭제 확인 다이얼로그 ─────────────────────────────────────────────────
 
@@ -1030,10 +949,10 @@ class ReviewFormSheet extends StatefulWidget {
   });
 
   @override
-  State<ReviewFormSheet> createState() => _ReviewFormSheetState();
+  State<ReviewFormSheet> createState() => ReviewFormSheetState();
 }
 
-class _ReviewFormSheetState extends State<ReviewFormSheet> {
+class ReviewFormSheetState extends State<ReviewFormSheet> {
   late double _rating;
   late TextEditingController _contentController;
   bool _isSubmitting = false;
