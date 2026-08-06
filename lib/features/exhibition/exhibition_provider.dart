@@ -8,6 +8,29 @@ import 'package:geolocator/geolocator.dart';
 import 'exhibition_api.dart';
 import 'exhibition_model.dart';
 
+// ── 거리 필터 상수 ────────────────────────────────────────────────────────────
+
+/// 주 반경: 이 안의 전부 표시 (정상 지역)
+const double kNearRadiusKm = 50.0;
+
+/// 희소 지역 판단 기준: 이 미만이면 반경 확장
+const int kMinItems = 5;
+
+/// 확장 시 채우려는 목표 개수
+const int kFillTarget = 10;
+
+/// 1차 확장 반경
+const double kMidRadiusKm = 100.0;
+
+/// 2차 확장 반경
+const double kFarRadiusKm = 150.0;
+
+/// 밀집 상황 안전 상한
+const int kHardCap = 50;
+
+/// 위치 없을 때 상한
+const int kNoLocCap = 15;
+
 // ── 시도명 변환 ──────────────────────────────────────────────────────────────
 
 /// GPS 좌표를 문화정보 API sido 파라미터로 변환
@@ -147,15 +170,14 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
       );
     }
 
-    // ── 거리 필터 ───────────────────────────────────────────────────────────
-    List<Exhibition> sorted;
+    // ── 거리 필터 및 표시 개수 결정 ─────────────────────────────────────────
+    List<Exhibition> finalItems;
+
     if (hasLocation && userLat != null && userLng != null) {
       final lat = userLat;
       final lng = userLng;
 
-      const double primaryRadiusKm = 80.0;
-      const double fallbackRadiusKm = 150.0;
-
+      // 좌표 있는 item만 거리 계산 (무좌표 item 제외)
       final withDist = result
           .where((e) => e.latitude != null && e.longitude != null)
           .map((e) => (
@@ -166,19 +188,40 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
           .toList()
         ..sort((a, b) => a.dist.compareTo(b.dist));
 
-      var filtered =
-          withDist.where((e) => e.dist <= primaryRadiusKm).toList();
-      if (kDebugMode) print('EXH: within 80km=${filtered.length}');
+      // 케이스 A: 위치 있음
+      final within50 =
+          withDist.where((e) => e.dist <= kNearRadiusKm).toList();
 
-      if (filtered.isEmpty) {
-        filtered =
-            withDist.where((e) => e.dist <= fallbackRadiusKm).toList();
-        if (kDebugMode) print('EXH: within 150km=${filtered.length}');
+      String radiusUsed;
+      List<Exhibition> selected;
+
+      if (within50.length >= kMinItems) {
+        // 정상 지역: 50km 이내 전부 (최대 kHardCap)
+        selected = within50.take(kHardCap).map((e) => e.item).toList();
+        radiusUsed = '50km';
+      } else {
+        // 희소 지역: 목표 kFillTarget개 채우기
+        final near100 =
+            withDist.where((e) => e.dist <= kMidRadiusKm).toList();
+        if (near100.length >= kFillTarget) {
+          selected =
+              near100.take(kFillTarget).map((e) => e.item).toList();
+          radiusUsed = '100km';
+        } else {
+          final near150 =
+              withDist.where((e) => e.dist <= kFarRadiusKm).toList();
+          selected =
+              near150.take(kFillTarget).map((e) => e.item).toList();
+          radiusUsed = '150km';
+        }
       }
 
-      sorted = filtered.map((e) => e.item).toList();
+      if (kDebugMode) {
+        print(
+            'EXH: within50=${within50.length} final=${selected.length} radiusUsed=$radiusUsed');
+      }
 
-      if (sorted.isEmpty) {
+      if (selected.isEmpty) {
         if (kDebugMode) print('EXH: 거리 필터 후 0건 — section hidden');
         return ExhibitionState(
           items: const [],
@@ -188,21 +231,23 @@ class ExhibitionNotifier extends AsyncNotifier<ExhibitionState> {
           userLng: userLng,
         );
       }
+
+      finalItems = selected;
     } else {
-      // 위치 거부/실패: endDate 임박순 → startDate 빠른 순
-      sorted = List.from(result)
+      // 케이스 B: 위치 없음/거부 — endDate 임박순 → startDate 빠른순, 최대 kNoLocCap
+      final sorted = List<Exhibition>.from(result)
         ..sort((a, b) {
           final cmp = a.endDate.compareTo(b.endDate);
           return cmp != 0 ? cmp : a.startDate.compareTo(b.startDate);
         });
+      finalItems = sorted.take(kNoLocCap).toList();
+      if (kDebugMode) {
+        print('EXH: no location — date sorted final=${finalItems.length}');
+      }
     }
 
-    // 최대 10개
-    final limited = sorted.take(10).toList();
-    if (kDebugMode) print('EXH: final items=${limited.length}');
-
     return ExhibitionState(
-      items: limited,
+      items: finalItems,
       isLoading: false,
       hasLocation: hasLocation,
       userLat: userLat,
