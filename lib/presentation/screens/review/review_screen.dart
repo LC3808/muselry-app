@@ -135,12 +135,13 @@ class ReviewScreen extends ConsumerWidget {
   /// 방문 기록 선택 후 리뷰 작성 폼 표시 (v1.6: visit 필수)
   void _showWriteBottomSheet(BuildContext context, WidgetRef ref,
       {required Visit visit}) {
+    // A: GlobalKey를 builder 밖에서 한 번만 생성 — builder 재실행 시 State 교체 방지
+    final sheetKey = GlobalKey<_ReviewFormSheetState>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) {
-        final sheetKey = GlobalKey<_ReviewFormSheetState>();
         return ReviewFormSheet(
           key: sheetKey,
           museumId: museumId,
@@ -990,6 +991,8 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
   final List<File> _pendingImages = []; // 선택된 임시 파일 목록
   bool _imageUploading = false;
   late ReviewImageUploadService _imageService;
+  // A: 명시적 FocusNode — builder 재실행 시 포커스 유지
+  late final FocusNode _contentFocusNode;
 
   @override
   void initState() {
@@ -1003,10 +1006,13 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
     final client = Supabase.instance.client;
     final repo = ReviewImageRepository(client);
     _imageService = ReviewImageUploadService(client, repo);
+    // A: FocusNode 초기화
+    _contentFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
+    _contentFocusNode.dispose();
     _contentController.dispose();
     // 임시 파일 정리
     for (final f in _pendingImages) {
@@ -1093,6 +1099,7 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
           reviewId: reviewId,
           file: _pendingImages[i],
           displayOrder: i,
+          isJpeg: _pendingImages[i].path.endsWith('.jpg'),
         );
       } catch (e) {
         if (kDebugMode) print('REVIEW: image upload failed index=$i: $e');
@@ -1229,6 +1236,7 @@ class _ReviewFormSheetState extends State<ReviewFormSheet> {
               ),
               const SizedBox(height: 8),
               TextField(
+                focusNode: _contentFocusNode,
                 controller: _contentController,
                 maxLines: 5,
                 maxLength: _maxLength,
