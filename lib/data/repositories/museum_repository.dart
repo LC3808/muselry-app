@@ -259,6 +259,17 @@ class MuseumRepository {
   // 키: normalized_alias, 값: museum_id
   Map<String, String>? _aliasCache;
 
+  /// DB public.normalize_museum_name() 규칙과 동일한 정규화 함수
+  /// - lowercase
+  /// - 공백 제거
+  /// - 괄호 및 특수문자 제거
+  /// - 한글/영문/숫자만 유지
+  static String normalizeMuseumName(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^0-9a-z가-힣]'), '');
+  }
+
   /// museum_aliases 테이블에서 alias 매핑 로드 (normalized_alias → museum_id)
   /// 이미 로드된 경우 캐시 반환
   Future<Map<String, String>> _loadAliases() async {
@@ -278,13 +289,13 @@ class MuseumRepository {
   }
 
   /// 문화행사 장소명으로 museums 테이블에서 정규화 일치 조회
-  /// normalize(s) = 공백 전부 제거 + trim
-  /// 1차: normalize(place) == normalize(museum.name) 정확일치
-  /// 2차: normalize(place) == normalize(museum.name) 정규화 일치 (대소문자 동일)
-  /// 3차: museum_aliases.normalized_alias 일치 (DB 기반, 코드 내부 Map 제거)
+  /// normalizeMuseumName() = DB normalize_museum_name() 동일 규칙
+  /// 1차: place.trim() == museum.name 원본 정확일치
+  /// 2차: normalizeMuseumName(place) == normalizeMuseumName(museum.name)
+  /// 3차: museum_aliases.normalized_alias == normalizeMuseumName(place)
   /// 실패 시 null 반환 + kDebugMode 미매칭 로그
   Future<Museum?> findMuseumByName(String place) async {
-    final normalized = place.replaceAll(' ', '').trim();
+    final normalized = normalizeMuseumName(place);
     if (normalized.isEmpty) return null;
     try {
       // museums 목록 로드
@@ -295,14 +306,13 @@ class MuseumRepository {
           .limit(500);
       final museums = (response as List).map((e) => Museum.fromJson(e)).toList();
 
-      // 1차: 정확일치 (name 원본)
+      // 1차: 원본 정확일치
       for (final m in museums) {
         if (m.name == place.trim()) return m;
       }
-      // 2차: 정규화 일치 (normalize 후 비교)
+      // 2차: normalizeMuseumName 일치
       for (final m in museums) {
-        final mNorm = m.name.replaceAll(' ', '').trim();
-        if (mNorm == normalized) return m;
+        if (normalizeMuseumName(m.name) == normalized) return m;
       }
 
       // 3차: museum_aliases DB 룩업
