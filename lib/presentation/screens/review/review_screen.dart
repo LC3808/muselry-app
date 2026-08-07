@@ -42,16 +42,6 @@ class ReviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reviewsAsync = ref.watch(museumReviewsProvider(museumId));
     final currentUser = ref.watch(currentUserProvider);
-    // v0.5.2 진단 로그 (원인 확정 후 제거 예정)
-    if (kDebugMode) {
-      debugPrint('REVIEW_LIST: museumId=$museumId museumName=$museumName');
-      reviewsAsync.when(
-        loading: () => debugPrint('REVIEW_LIST: loading'),
-        error: (e, _) => debugPrint('REVIEW_LIST: error=$e'),
-        data: (list) => debugPrint('REVIEW_LIST: count=${list.length}'),
-      );
-    }
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -94,12 +84,9 @@ class ReviewScreen extends ConsumerWidget {
             ref.invalidate(museumReviewsProvider(museumId));
           }),
           data: (reviews) {
-            if (kDebugMode) debugPrint('REVIEW_LIST: data branch entered, reviews.length=${reviews.length}');
             if (reviews.isEmpty) {
-              if (kDebugMode) debugPrint('REVIEW_LIST: isEmpty=true → _EmptyState');
               return const _EmptyState();
             }
-            if (kDebugMode) debugPrint('REVIEW_LIST: isEmpty=false → ListView.separated itemCount=${reviews.length}');
             // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
             final reviewIdsKey = reviews.map((r) => r.id).join(',');
             final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
