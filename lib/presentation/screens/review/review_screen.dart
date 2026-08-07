@@ -94,9 +94,12 @@ class ReviewScreen extends ConsumerWidget {
             ref.invalidate(museumReviewsProvider(museumId));
           }),
           data: (reviews) {
+            if (kDebugMode) debugPrint('REVIEW_LIST: data branch entered, reviews.length=${reviews.length}');
             if (reviews.isEmpty) {
+              if (kDebugMode) debugPrint('REVIEW_LIST: isEmpty=true → _EmptyState');
               return const _EmptyState();
             }
+            if (kDebugMode) debugPrint('REVIEW_LIST: isEmpty=false → ListView.separated itemCount=${reviews.length}');
             // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
             final reviewIdsKey = reviews.map((r) => r.id).join(',');
             final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
