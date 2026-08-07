@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
+    
+    
     <!-- 인터넷 권한 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 위치 권한 -->
@@ -9,6 +10,13 @@
         android:label="뮤즐리"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+         <activity
+
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            
         <!-- 네이버 지도 SDK Client ID (ISSUE-006: Day 10 빌드 전 dart-define 방식으로 전환 예정) -->
         <meta-data
             android:name="com.naver.maps.map.CLIENT_ID"
