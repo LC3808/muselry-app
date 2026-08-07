@@ -428,8 +428,7 @@ class _ReviewStatusRow extends StatelessWidget {
         if (hasActiveReview)
           TextButton.icon(
             onPressed: () => context.push(
-              '/museum/$museumId/reviews',
-              extra: {'museumName': museumName},
+              '/museum/$museumId/reviews?name=${Uri.encodeComponent(museumName)}',
             ),
             icon: const Icon(Icons.edit_outlined, size: 14),
             label: const Text('수정하기'),
@@ -444,8 +443,7 @@ class _ReviewStatusRow extends StatelessWidget {
         else
           ElevatedButton.icon(
             onPressed: () => context.push(
-              '/museum/$museumId/reviews',
-              extra: {'museumName': museumName},
+              '/museum/$museumId/reviews?name=${Uri.encodeComponent(museumName)}',
             ),
             icon: const Icon(Icons.rate_review_outlined, size: 14),
             label: const Text('리뷰 쓰기'),

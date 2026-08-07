@@ -51,21 +51,21 @@ class ReviewScreen extends ConsumerWidget {
       bottomNavigationBar: currentUser != null
           ? SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: SizedBox(
-                  height: 52,
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: Center(
                   child: ElevatedButton.icon(
                     onPressed: () => _showVisitSelectSheet(context, ref),
-                    icon: const Icon(Icons.edit_outlined),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text(
                       '리뷰 작성',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       elevation: 0,
                     ),
@@ -86,11 +86,7 @@ class ReviewScreen extends ConsumerWidget {
           }),
           data: (reviews) {
             if (reviews.isEmpty) {
-              return _EmptyState(
-                onWrite: currentUser != null
-                    ? () => _showVisitSelectSheet(context, ref)
-                    : () => _showLoginRequired(context),
-              );
+              return const _EmptyState();
             }
             // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
             final reviewIdsKey = reviews.map((r) => r.id).join(',');
@@ -1497,36 +1493,28 @@ class _RatingSelector extends StatelessWidget {
 // ─── 빈 상태 ────────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  final VoidCallback onWrite;
-
-  const _EmptyState({required this.onWrite});
+  const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.rate_review_outlined,
+          Icon(Icons.rate_review_outlined,
               size: 64, color: AppTheme.dividerColor),
-          const SizedBox(height: 16),
-          const Text(
+          SizedBox(height: 16),
+          Text(
             '아직 리뷰가 없습니다.',
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppTheme.textSecondaryColor),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             '첫 번째 리뷰를 작성해 보세요!',
             style: TextStyle(color: AppTheme.textSecondaryColor),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: onWrite,
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('리뷰 작성'),
           ),
         ],
       ),
