@@ -42,6 +42,15 @@ class ReviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reviewsAsync = ref.watch(museumReviewsProvider(museumId));
     final currentUser = ref.watch(currentUserProvider);
+    // v0.5.2 진단 로그 (원인 확정 후 제거 예정)
+    if (kDebugMode) {
+      debugPrint('REVIEW_LIST: museumId=$museumId museumName=$museumName');
+      reviewsAsync.when(
+        loading: () => debugPrint('REVIEW_LIST: loading'),
+        error: (e, _) => debugPrint('REVIEW_LIST: error=$e'),
+        data: (list) => debugPrint('REVIEW_LIST: count=${list.length}'),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
