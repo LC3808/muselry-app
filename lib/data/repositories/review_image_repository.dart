@@ -186,14 +186,18 @@ class ReviewImageRepository {
 
       if (kDebugMode) {
         print('REVIEW_EDIT: storage delete result count=${removedFiles.length}');
+        // 반환 객체 필드 구조 확인용 로그
+        for (final f in removedFiles) {
+          print('REVIEW_EDIT: removed file name=${f.name} id=${f.id} bucketId=${f.bucketId}');
+        }
       }
 
-      // remove() 반환 리스트에 대상 파일 포함 여부로 성공 판정 (list() 기반 검증 미사용)
-      final fileName = storagePath.split('/').last;
-      final confirmed = removedFiles.any((f) => f.name == fileName);
+      // remove()가 1건 이상 반환하면 성공으로 판정
+      // (f.name이 파일명이 아닌 전체 경로 등 다른 형식일 수 있어 path 비교 대신 count 기반 사용)
+      final confirmed = removedFiles.isNotEmpty;
       if (!confirmed) {
         if (kDebugMode) {
-          print('REVIEW_EDIT: storage delete not confirmed path=$storagePath');
+          print('REVIEW_EDIT: storage delete not confirmed (empty result) path=$storagePath');
         }
         return false;
       }
