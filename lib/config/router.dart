@@ -153,18 +153,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return MuseumDetailScreen(museumId: id);
         },
+        // v0.5.2 피스: /museum/:id/reviews를 서브라우트로 등록
+        // GoRouter는 /museum/:id가 /museum/xxx/reviews를 lookahead로 매칭하므로
+        // 서브라우트로 등록해야 정상 라우팅됨
+        routes: [
+          GoRoute(
+            path: 'reviews',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              final name = state.uri.queryParameters['name'] ?? '박물관';
+              return ReviewScreen(museumId: id, museumName: name);
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.visitHistory,
         builder: (context, state) => const VisitHistoryScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.museumReviews,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          final name = state.uri.queryParameters['name'] ?? '박물관';
-          return ReviewScreen(museumId: id, museumName: name);
-        },
       ),
       GoRoute(
         path: AppRoutes.myReviews,
