@@ -46,17 +46,34 @@ class ReviewScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: Text('$museumName 리뷰'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: '리뷰 작성',
-            onPressed: currentUser != null
-                ? () => _showVisitSelectSheet(context, ref)
-                : () => _showLoginRequired(context),
-          ),
-        ],
+        title: Text(museumName.isNotEmpty ? '$museumName 리뷰' : '리뷰'),
       ),
+      bottomNavigationBar: currentUser != null
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showVisitSelectSheet(context, ref),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text(
+                      '리뷰 작성',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(museumReviewsProvider(museumId));
@@ -84,7 +101,7 @@ class ReviewScreen extends ConsumerWidget {
             final thumbnails = thumbnailsAsync.valueOrNull ?? {};
 
             return ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 72), // 하단 버튼 가림 방지
               itemCount: reviews.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
@@ -251,11 +268,13 @@ class ReviewScreen extends ConsumerWidget {
                 //    status 무관 전체 조회 (published + removed 모두 포함)
                 final storagePaths = await imgRepo.loadStoragePaths(review.id);
                 if (kDebugMode) print('REVIEW_DELETE: storage paths to remove=${storagePaths.length}');
-                // 2. reviews.status = removed (review_images는 FK ON DELETE CASCADE로 자동 정리)
+                // 2. review_images 일괄 status='removed' (소프트삭제 일관성 유지)
+                await imgRepo.softDeleteAllByReviewId(review.id);
+                // 3. reviews.status = removed
                 await ref
                     .read(myReviewsProvider.notifier)
                     .deleteReview(review.id);
-                // 3. Storage 파일 삭제 — owner 세션으로 호출, 반환값 기반 성공/실패 집계
+                // 4. Storage 파일 삭제 — owner 세션으로 호출, 반환값 기반 성공/실패 집계
                 if (storagePaths.isNotEmpty) {
                   final storageResult = await imgRepo.deleteStorageFiles(storagePaths);
                   if (kDebugMode) {
