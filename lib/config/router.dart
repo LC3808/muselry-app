@@ -147,17 +147,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // v0.5.2 피스: museumReviews를 museumDetail보다 먼저 등록
-      // GoRouter는 routes 배열 순서대로 매칭하므로, 더 구체적인 /museum/:id/reviews를
-      // /museum/:id보다 먼저 등록하면 정상 라우팅됨 (서브라우트 구조 제거)
-      GoRoute(
-        path: AppRoutes.museumReviews,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          final name = state.uri.queryParameters['name'] ?? '박물관';
-          return ReviewScreen(museumId: id, museumName: name);
-        },
-      ),
       GoRoute(
         path: AppRoutes.museumDetail,
         builder: (context, state) {
@@ -168,6 +157,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.visitHistory,
         builder: (context, state) => const VisitHistoryScreen(),
+      ),
+      // e36819c 원위치 복원 (3481910/c69ced3 실험 제거)
+      GoRoute(
+        path: AppRoutes.museumReviews,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final name = state.uri.queryParameters['name'] ?? '박물관';
+          return ReviewScreen(museumId: id, museumName: name);
+        },
       ),
       GoRoute(
         path: AppRoutes.myReviews,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../config/router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -95,7 +96,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   }
 
   Widget _buildBody(CommunityReviewsState state, String? currentUserId) {
+    if (kDebugMode) {
+      debugPrint('COMMUNITY_DEBUG: screen build isLoading=${state.isLoading} count=${state.reviews.length} error=${state.error}');
+    }
     if (state.isLoading && state.reviews.isEmpty) {
+      if (kDebugMode) debugPrint('COMMUNITY_DEBUG: showing loading spinner (isLoading=true, reviews.isEmpty=true)');
       return const Center(child: CircularProgressIndicator());
     }
     if (state.error != null && state.reviews.isEmpty) {

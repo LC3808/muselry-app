@@ -231,17 +231,22 @@ class CommunityReviewsNotifier extends Notifier<CommunityReviewsState> {
 
   /// 첫 페이지 로드 (pull-to-refresh 포함)
   Future<void> fetchInitial() async {
+      if (kDebugMode) debugPrint('COMMUNITY_DEBUG: fetchInitial start');
       state = state.copyWith(isLoading: true, error: null);
       try {
         final repo = ref.read(reviewRepositoryProvider);
+        if (kDebugMode) debugPrint('COMMUNITY_DEBUG: repository fetchCommunityReviews start');
         final reviews = await repo.fetchCommunityReviews(page: 0);
+        if (kDebugMode) debugPrint('COMMUNITY_DEBUG: repository fetchCommunityReviews success count=${reviews.length}');
         state = CommunityReviewsState(
           reviews: reviews,
           isLoading: false,
           hasMore: reviews.length >= 20,
           currentPage: 0,
         );
+        if (kDebugMode) debugPrint('COMMUNITY_DEBUG: provider state updated count=${reviews.length}');
       } catch (e) {
+        if (kDebugMode) debugPrint('COMMUNITY_DEBUG: fetchInitial error=$e');
         state = state.copyWith(isLoading: false, error: e.toString());
       }
     }
