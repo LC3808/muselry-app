@@ -186,10 +186,6 @@ class ReviewImageRepository {
 
       if (kDebugMode) {
         print('REVIEW_EDIT: storage delete result count=${removedFiles.length}');
-        // 반환 객체 필드 구조 확인용 로그
-        for (final f in removedFiles) {
-          print('REVIEW_EDIT: removed file name=${f.name} id=${f.id} bucketId=${f.bucketId}');
-        }
       }
 
       // remove()가 1건 이상 반환하면 성공으로 판정

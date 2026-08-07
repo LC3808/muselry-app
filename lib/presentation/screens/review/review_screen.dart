@@ -40,15 +40,6 @@ class ReviewScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (kDebugMode) {
-      final mq = MediaQuery.of(context);
-      debugPrint(
-        'REVIEW_LAYOUT: screen=${mq.size.width}x${mq.size.height} '
-        'padding=${mq.padding} '
-        'viewInsets=${mq.viewInsets}'
-      );
-      debugPrint('ROUTE_DEBUG: museumReviews museumId=$museumId museumName=$museumName');
-    }
     final reviewsAsync = ref.watch(museumReviewsProvider(museumId));
     final currentUser = ref.watch(currentUserProvider);
     return Scaffold(
@@ -56,7 +47,6 @@ class ReviewScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(museumName.isNotEmpty ? '$museumName 리뷰' : '리뷰'),
       ),
-      // PHASE A: 정상 작동(edae477) 시점 SizedBox(height:52) 복원
       bottomNavigationBar: currentUser != null
           ? SafeArea(
               child: Padding(
@@ -84,69 +74,57 @@ class ReviewScreen extends ConsumerWidget {
               ),
             )
           : null,
-      // PHASE A: d90aab5 Column+Expanded 원복 → 정상 작동(edae477) body 구조
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (kDebugMode) {
-            debugPrint('REVIEW_LAYOUT: maxWidth=${constraints.maxWidth} maxHeight=${constraints.maxHeight}');
-          }
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(museumReviewsProvider(museumId));
-              ref.invalidate(myReviewsForMuseumProvider(museumId));
-            },
-            child: reviewsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _ErrorState(onRetry: () {
-                ref.invalidate(museumReviewsProvider(museumId));
-              }),
-              data: (reviews) {
-                if (kDebugMode) debugPrint('REVIEW_RENDER: data count=${reviews.length}');
-                if (reviews.isEmpty) {
-                  return const _EmptyState();
-                }
-                // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
-                final reviewIdsKey = reviews.map((r) => r.id).join(',');
-                final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
-                final counts = countsAsync.valueOrNull ?? {};
-                // v0.5.2: 대표사진 일괄 조회
-                final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
-                final thumbnails = thumbnailsAsync.valueOrNull ?? {};
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(museumReviewsProvider(museumId));
+          ref.invalidate(myReviewsForMuseumProvider(museumId));
+        },
+        child: reviewsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => _ErrorState(onRetry: () {
+            ref.invalidate(museumReviewsProvider(museumId));
+          }),
+          data: (reviews) {
+            if (reviews.isEmpty) {
+              return const _EmptyState();
+            }
+            // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
+            final reviewIdsKey = reviews.map((r) => r.id).join(',');
+            final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
+            final counts = countsAsync.valueOrNull ?? {};
+            // v0.5.2: 대표사진 일괄 조회
+            final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
+            final thumbnails = thumbnailsAsync.valueOrNull ?? {};
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 72), // 하단 버튼 가림 방지
-                  itemCount: reviews.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    if (kDebugMode) {
-                      debugPrint('REVIEW_RENDER: itemBuilder index=$index reviewId=${reviews[index].id}');
-                    }
-                    final review = reviews[index];
-                    final isMyReview = review.userId == currentUser?.id;
-                    return _ReviewCard(
-                      review: review,
-                      isMyReview: isMyReview,
-                      commentCount: counts[review.id],
-                      thumbnail: thumbnails[review.id], // v0.5.2: 대표사진
-                      onTap: () => context.push(
-                        AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
-                      ),
-                      onEdit: isMyReview
-                          ? () => showReviewEditSheet(context: context, ref: ref, review: review)
-                          : null,
-                      onDelete: isMyReview
-                          ? () => _showDeleteDialog(context, ref, review)
-                          : null,
-                      onReport: !isMyReview && currentUser != null
-                          ? () => _showReportDialog(context, ref, review.id)
-                          : null,
-                    );
-                  },
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 72), // 하단 버튼 가림 방지
+              itemCount: reviews.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final review = reviews[index];
+                final isMyReview = review.userId == currentUser?.id;
+                return _ReviewCard(
+                  review: review,
+                  isMyReview: isMyReview,
+                  commentCount: counts[review.id],
+                  thumbnail: thumbnails[review.id], // v0.5.2: 대표사진
+                  onTap: () => context.push(
+                    AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
+                  ),
+                  onEdit: isMyReview
+                      ? () => showReviewEditSheet(context: context, ref: ref, review: review)
+                      : null,
+                  onDelete: isMyReview
+                      ? () => _showDeleteDialog(context, ref, review)
+                      : null,
+                  onReport: !isMyReview && currentUser != null
+                      ? () => _showReportDialog(context, ref, review.id)
+                      : null,
                 );
               },
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -735,7 +713,6 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kDebugMode) debugPrint('REVIEW_RENDER: card build reviewId=${review.id}');
     final theme = Theme.of(context);
     return Card(
       clipBehavior: Clip.antiAlias, // R22: InkWell 리플 클립
