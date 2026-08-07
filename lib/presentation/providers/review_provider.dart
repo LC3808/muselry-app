@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/review_repository.dart';
 import '../../domain/models/review.dart';
@@ -292,3 +293,39 @@ final reviewThumbnailsProvider =
     return repo.loadThumbnails(ids);
   },
 );
+
+// ─── v0.5.2: 리뷰 삭제 공통 함수 (3곳 단일화) ───────────────────────────────
+/// 리뷰 삭제 4단계 flow:
+///   1. loadStoragePaths — status 무관 전체 storage_path 확보
+///   2. softDeleteAllByReviewId — review_images.status = removed
+///   3. deleteReview — reviews.status = removed
+///   4. deleteStorageFiles — Storage 파일 owner 세션으로 remove
+///
+/// 각 화면에서 삭제 후 provider invalidate는 호출 측에서 직접 처리.
+Future<void> deleteReviewWithImages(WidgetRef ref, String reviewId) async {
+  final imgRepo = ref.read(reviewImageRepositoryProvider);
+  // 1. storage_path 목록 메모리 확보 (삭제 전에 조회)
+  final storagePaths = await imgRepo.loadStoragePaths(reviewId);
+  if (kDebugMode) {
+    debugPrint('REVIEW_DELETE: storage paths to remove=${storagePaths.length}');
+  }
+  // 2. review_images 일괄 status='removed' (소프트삭제 일관성)
+  await imgRepo.softDeleteAllByReviewId(reviewId);
+  // 3. reviews.status = removed
+  await ref.read(myReviewsProvider.notifier).deleteReview(reviewId);
+  // 4. Storage 파일 삭제 — 반환값 기반 성공/실패 집계
+  if (storagePaths.isNotEmpty) {
+    final result = await imgRepo.deleteStorageFiles(storagePaths);
+    if (kDebugMode) {
+      debugPrint(
+        'REVIEW_DELETE: storage delete '
+        'requested=${result.requested} '
+        'success=${result.succeeded} '
+        'failed=${result.failed}',
+      );
+      if (result.failed > 0) {
+        debugPrint('REVIEW_DELETE: ${result.failed} orphan files remain (sweeper target)');
+      }
+    }
+  }
+}

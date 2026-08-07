@@ -257,41 +257,14 @@ class ReviewScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                // v0.5.2: 삭제 정합성 — storage_path 확보 → review soft delete
-                //          → review_images soft delete → Storage 삭제
-                final imgRepo = ref.read(reviewImageRepositoryProvider);
-                // 1. storage_path 목록 메모리 확보 (삭제 전에 조회 — 삭제 후엔 경로 못 구함)
-                //    status 무관 전체 조회 (published + removed 모두 포함)
-                final storagePaths = await imgRepo.loadStoragePaths(review.id);
-                if (kDebugMode) print('REVIEW_DELETE: storage paths to remove=${storagePaths.length}');
-                // 2. review_images 일괄 status='removed' (소프트삭제 일관성 유지)
-                await imgRepo.softDeleteAllByReviewId(review.id);
-                // 3. reviews.status = removed
-                await ref
-                    .read(myReviewsProvider.notifier)
-                    .deleteReview(review.id);
-                // 4. Storage 파일 삭제 — owner 세션으로 호출, 반환값 기반 성공/실패 집계
-                if (storagePaths.isNotEmpty) {
-                  final storageResult = await imgRepo.deleteStorageFiles(storagePaths);
-                  if (kDebugMode) {
-                    print(
-                      'REVIEW_DELETE: storage delete '
-                      'requested=${storageResult.requested} '
-                      'success=${storageResult.succeeded} '
-                      'failed=${storageResult.failed}',
-                    );
-                  }
-                  if (kDebugMode && storageResult.failed > 0) {
-                    debugPrint('REVIEW_DELETE: ${storageResult.failed} orphan files remain (sweeper target)');
-                  }
-                }
+                // v0.5.2: 4단계 공통 삭제 flow (사진 정리 포함)
+                await deleteReviewWithImages(ref, review.id);
+                // 삭제 후 관련 provider invalidate
                 ref
                     .read(museumReviewsProvider(museumId).notifier)
                     .removeReview(review.id);
                 ref.invalidate(myReviewsForMuseumProvider(museumId));
-                // v1.9 이슈 5: 삭제 후 해당 방문 리뷰 캐시도 무효화
                 ref.invalidate(myReviewForVisitProvider(review.visitId));
-                // v0.5.1: 사진 provider 무효화
                 ref.invalidate(communityReviewsProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

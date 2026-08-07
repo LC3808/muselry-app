@@ -128,10 +128,25 @@ class ReviewDetailScreen extends ConsumerWidget {
                           ),
                         );
                         if (confirmed == true && context.mounted) {
-                          await ref
-                              .read(myReviewsProvider.notifier)
-                              .deleteReview(review.id);
-                          if (context.mounted) context.pop();
+                          try {
+                            // v0.5.2: 4단계 공통 삭제 flow (사진 정리 포함)
+                            await deleteReviewWithImages(ref, review.id);
+                            // 삭제 후 관련 provider invalidate
+                            ref.invalidate(communityReviewsProvider);
+                            ref.invalidate(museumReviewsProvider(review.museumId));
+                            ref.invalidate(myReviewsForMuseumProvider(review.museumId));
+                            ref.invalidate(myReviewForVisitProvider(review.visitId));
+                            if (context.mounted) context.pop();
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('삭제 중 오류가 발생했습니다: $e'),
+                                  backgroundColor: AppTheme.errorColor,
+                                ),
+                              );
+                            }
+                          }
                         }
                       }
                     },

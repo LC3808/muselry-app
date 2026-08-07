@@ -124,14 +124,14 @@ class MyReviewsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await ref
-                    .read(myReviewsProvider.notifier)
-                    .deleteReview(review.id);
-                // M7-G-6: 삭제 후 관련 provider invalidate
+                // v0.5.2: 4단계 공통 삭제 flow (사진 정리 포함)
+                await deleteReviewWithImages(ref, review.id);
+                // 삭제 후 관련 provider invalidate
                 Future.microtask(() {
                   ref.invalidate(myReviewsForMuseumProvider(review.museumId));
                   ref.invalidate(myReviewForVisitProvider(review.visitId));
                   ref.invalidate(museumReviewsProvider(review.museumId));
+                  ref.invalidate(communityReviewsProvider);
                 });
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
