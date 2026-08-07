@@ -267,7 +267,7 @@ class ReviewScreen extends ConsumerWidget {
                     );
                   }
                   if (kDebugMode && storageResult.failed > 0) {
-                    print('REVIEW_DELETE: ${storageResult.failed} orphan files remain (sweeper target)');
+                    debugPrint('REVIEW_DELETE: ${storageResult.failed} orphan files remain (sweeper target)');
                   }
                 }
                 ref
