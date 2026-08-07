@@ -119,15 +119,18 @@ class ReviewImageRepository {
 
   /// 리뷰 삭제 전 storage_path 목록을 메모리에 확보
   /// (ON DELETE CASCADE로 review_images 행이 사라지기 전에 호출해야 함)
+  /// 리뷰 삭제 전 storage_path 목록을 메모리에 확보
+  /// status 무관 전체 조회 (published + removed 모두 포함)
+  /// ON DELETE CASCADE로 review_images 행이 사라지기 전에 호출해야 함
   Future<List<String>> loadStoragePaths(String reviewId) async {
     try {
       final response = await _client
           .from('review_images')
           .select('storage_path')
-          .eq('review_id', reviewId)
-          .eq('status', 'published');
+          .eq('review_id', reviewId);
       return (response as List)
           .map((e) => e['storage_path'] as String)
+          .where((p) => p.isNotEmpty)
           .toList();
     } catch (e) {
       if (kDebugMode) print('REVIEW: loadStoragePaths failed: $e');

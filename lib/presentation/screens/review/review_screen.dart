@@ -247,18 +247,29 @@ class ReviewScreen extends ConsumerWidget {
                 // v0.5.2: 삭제 정합성 — storage_path 확보 → review soft delete
                 //          → review_images soft delete → Storage 삭제
                 final imgRepo = ref.read(reviewImageRepositoryProvider);
-                // 1. storage_path 목록 메모리 확보 (soft delete 후 조회 불가)
+                // 1. storage_path 목록 메모리 확보 (삭제 전에 조회 — 삭제 후엔 경로 못 구함)
+                //    status 무관 전체 조회 (published + removed 모두 포함)
                 final storagePaths = await imgRepo.loadStoragePaths(review.id);
-                if (kDebugMode) print('REVIEW_DELETE: image rows to remove=${storagePaths.length}');
-                // 2. reviews.status = removed
+                if (kDebugMode) print('REVIEW_DELETE: storage paths to remove=${storagePaths.length}');
+                // 2. reviews.status = removed (review_images는 FK ON DELETE CASCADE로 자동 정리)
                 await ref
                     .read(myReviewsProvider.notifier)
                     .deleteReview(review.id);
-                // 3. review_images.status = removed (ON DELETE CASCADE 없음)
-                await imgRepo.softDeleteAllByReviewId(review.id);
-                // 4. Storage 파일 삭제 (orphan 허용)
-                await imgRepo.deleteStorageFilesByPaths(storagePaths);
-                if (kDebugMode) print('REVIEW_DELETE: storage deleted=${storagePaths.length}');
+                // 3. Storage 파일 삭제 — owner 세션으로 호출, 반환값 기반 성공/실패 집계
+                if (storagePaths.isNotEmpty) {
+                  final storageResult = await imgRepo.deleteStorageFiles(storagePaths);
+                  if (kDebugMode) {
+                    print(
+                      'REVIEW_DELETE: storage delete '
+                      'requested=${storageResult.requested} '
+                      'success=${storageResult.succeeded} '
+                      'failed=${storageResult.failed}',
+                    );
+                  }
+                  if (storageResult.failed > 0 && kDebugMode) {
+                    print('REVIEW_DELETE: ${storageResult.failed} orphan files remain (sweeper target)');
+                  }
+                }
                 ref
                     .read(museumReviewsProvider(museumId).notifier)
                     .removeReview(review.id);
