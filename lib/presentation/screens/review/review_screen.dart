@@ -73,57 +73,63 @@ class ReviewScreen extends ConsumerWidget {
               ),
             )
           : null,
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(museumReviewsProvider(museumId));
-          ref.invalidate(myReviewsForMuseumProvider(museumId));
-        },
-        child: reviewsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => _ErrorState(onRetry: () {
-            ref.invalidate(museumReviewsProvider(museumId));
-          }),
-          data: (reviews) {
-            if (reviews.isEmpty) {
-              return const _EmptyState();
-            }
-            // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
-            final reviewIdsKey = reviews.map((r) => r.id).join(',');
-            final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
-            final counts = countsAsync.valueOrNull ?? {};
-            // v0.5.2: 대표사진 일괄 조회
-            final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
-            final thumbnails = thumbnailsAsync.valueOrNull ?? {};
-
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 72), // 하단 버튼 가림 방지
-              itemCount: reviews.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final review = reviews[index];
-                final isMyReview = review.userId == currentUser?.id;
-                return _ReviewCard(
-                  review: review,
-                  isMyReview: isMyReview,
-                  commentCount: counts[review.id],
-                  thumbnail: thumbnails[review.id], // v0.5.2: 대표사진
-                  onTap: () => context.push(
-                    AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
-                  ),
-                  onEdit: isMyReview
-                      ? () => showReviewEditSheet(context: context, ref: ref, review: review)
-                      : null,
-                  onDelete: isMyReview
-                      ? () => _showDeleteDialog(context, ref, review)
-                      : null,
-                  onReport: !isMyReview && currentUser != null
-                      ? () => _showReportDialog(context, ref, review.id)
-                      : null,
-                );
+      body: Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(museumReviewsProvider(museumId));
+                ref.invalidate(myReviewsForMuseumProvider(museumId));
               },
-            );
-          },
-        ),
+              child: reviewsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _ErrorState(onRetry: () {
+                  ref.invalidate(museumReviewsProvider(museumId));
+                }),
+                data: (reviews) {
+                  if (reviews.isEmpty) {
+                    return const _EmptyState();
+                  }
+                  // R22: 댓글 수 일괄 조회 (R18과 동일한 join key 방식)
+                  final reviewIdsKey = reviews.map((r) => r.id).join(',');
+                  final countsAsync = ref.watch(commentCountsProvider(reviewIdsKey));
+                  final counts = countsAsync.valueOrNull ?? {};
+                  // v0.5.2: 대표사진 일괄 조회
+                  final thumbnailsAsync = ref.watch(reviewThumbnailsProvider(reviewIdsKey));
+                  final thumbnails = thumbnailsAsync.valueOrNull ?? {};
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    itemCount: reviews.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final review = reviews[index];
+                      final isMyReview = review.userId == currentUser?.id;
+                      return _ReviewCard(
+                        review: review,
+                        isMyReview: isMyReview,
+                        commentCount: counts[review.id],
+                        thumbnail: thumbnails[review.id], // v0.5.2: 대표사진
+                        onTap: () => context.push(
+                          AppRoutes.reviewDetail.replaceFirst(':reviewId', review.id),
+                        ),
+                        onEdit: isMyReview
+                            ? () => showReviewEditSheet(context: context, ref: ref, review: review)
+                            : null,
+                        onDelete: isMyReview
+                            ? () => _showDeleteDialog(context, ref, review)
+                            : null,
+                        onReport: !isMyReview && currentUser != null
+                            ? () => _showReportDialog(context, ref, review.id)
+                            : null,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
