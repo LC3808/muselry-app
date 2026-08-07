@@ -185,18 +185,18 @@ class ReviewImageRepository {
         print('REVIEW_EDIT: storage delete result count=${removedFiles.length}');
       }
 
-      if (removedFiles.isEmpty) {
+      // remove() 반환 리스트에 대상 파일 포함 여부로 성공 판정 (list() 기반 검증 미사용)
+      final fileName = storagePath.split('/').last;
+      final confirmed = removedFiles.any((f) => f.name == fileName);
+      if (!confirmed) {
         if (kDebugMode) {
           print('REVIEW_EDIT: storage delete not confirmed path=$storagePath');
         }
-        // 삭제 후 파일 존재 여부 검증 (kDebugMode에서만)
-        if (kDebugMode) await _verifyFileDeleted(storagePath);
         return false;
       }
 
       if (kDebugMode) {
         print('REVIEW_EDIT: storage delete success path=$storagePath');
-        await _verifyFileDeleted(storagePath);
       }
 
       return true;
@@ -222,29 +222,7 @@ class ReviewImageRepository {
     }
   }
 
-  /// 삭제 후 파일 존재 여부 검증 (kDebugMode 전용)
-  Future<void> _verifyFileDeleted(String storagePath) async {
-    try {
-      final folderPath = storagePath.contains('/')
-          ? storagePath.substring(0, storagePath.lastIndexOf('/'))
-          : '';
-      final fileName = storagePath.substring(storagePath.lastIndexOf('/') + 1);
 
-      final remainingFiles = await _client.storage
-          .from(_bucket)
-          .list(path: folderPath);
-
-      final stillExists = remainingFiles.any((file) => file.name == fileName);
-      if (kDebugMode) {
-        print(
-          'REVIEW_EDIT: storage verify exists=$stillExists '
-          'path=$storagePath',
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) print('REVIEW_EDIT: storage verify failed: $e');
-    }
-  }
 
   /// 여러 Storage 파일 삭제 + 결과 집계
   ///
