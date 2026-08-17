@@ -61,8 +61,8 @@
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<!-- 카카오 네이티브 앱 키를 kakao${KAKAO_NATIVE_APP_KEY} 형식으로 입력 필요 -->
-					<string>kakaomuselry</string>
+					<!-- 카카오 네이티브 앱 키 기반 scheme (kakao + KAKAO_NATIVE_APP_KEY). AndroidManifest와 동일 -->
+					<string>kakaoe2416aa7e2c133fbef183b7ab9dd81a9</string>
 				</array>
 			</dict>
 			<!-- Supabase OAuth 딥링크 콜백 (Google/Apple 로그인) -->
