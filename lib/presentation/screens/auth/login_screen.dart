@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -350,6 +352,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
+                    if (Platform.isIOS) ...[
                     const SizedBox(height: 12),
                     // Apple 로그인 버튼 (iOS 전용)
                     SizedBox(
@@ -382,6 +385,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
+                    ],
 
                     // 회원가입 링크
                     Row(

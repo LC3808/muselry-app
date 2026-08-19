@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../services/supabase/auth_service.dart';
 
 // ── AuthService 싱글턴 Provider ──────────────────────────────
@@ -155,13 +156,22 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
-  // Apple 로그인 (Supabase OAuth, iOS 전용)
+  // Apple 로그인 (네이티브 Sign in with Apple, iOS 전용)
   Future<void> signInWithApple() async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final launched = await _authService.signInWithApple();
-      if (!launched) throw Exception('Apple 로그인 창을 열 수 없습니다.');
-    });
+    try {
+      await _authService.signInWithApple();
+      state = const AsyncValue.data(null);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // 사용자가 취소한 경우는 오류로 표시하지 않음
+      if (e.code == AuthorizationErrorCode.canceled) {
+        state = const AsyncValue.data(null);
+      } else {
+        state = AsyncValue.error(e, StackTrace.current);
+      }
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
   // M8-1: 계정 삭제 (delete_my_account RPC → signOut)

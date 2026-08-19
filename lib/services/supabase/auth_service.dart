@@ -1,4 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'kakao_auth_service.dart';
 
 class AuthService {
@@ -53,15 +58,51 @@ class AuthService {
     );
   }
 
-  // ── Apple 로그인 (Supabase OAuth, iOS 전용) ───────────────
-  /// Sign in with Apple. iOS 빌드에서만 사용합니다.
-  /// Apple Developer 계정에서 Sign in with Apple 서비스 ID 및
-  /// 프로비저닝 프로파일 설정이 완료되어야 합니다.
-  Future<bool> signInWithApple() async {
-    return await _client.auth.signInWithOAuth(
-      OAuthProvider.apple,
-      redirectTo: 'io.supabase.muselry://login-callback',
+  // ── Apple 로그인 (네이티브 Sign in with Apple, iOS 전용) ──
+  /// iOS 네이티브 Sign in with Apple.
+  /// Apple identityToken을 Supabase signInWithIdToken으로 전달해 세션을 발급.
+  /// 이름은 최초 로그인 시에만 Apple이 제공하므로, 있으면 metadata에 저장한다.
+  Future<AuthResponse> signInWithApple() async {
+    final rawNonce = _client.auth.generateRawNonce();
+    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
+    final credential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+      nonce: hashedNonce,
     );
+
+    final idToken = credential.identityToken;
+    if (idToken == null) {
+      throw const AuthException('Apple ID Token을 가져오지 못했습니다.');
+    }
+
+    final response = await _client.auth.signInWithIdToken(
+      provider: OAuthProvider.apple,
+      idToken: idToken,
+      nonce: rawNonce,
+    );
+
+    // 이름은 최초 로그인 시에만 제공됨 → 있으면 저장(재로그인 시 null 정상)
+    final given = credential.givenName;
+    final family = credential.familyName;
+    if ((given != null && given.isNotEmpty) ||
+        (family != null && family.isNotEmpty)) {
+      final fullName = [given, family].whereType<String>().join(' ').trim();
+      try {
+        await _client.auth.updateUser(UserAttributes(data: {
+          'full_name': fullName,
+          'given_name': given,
+          'family_name': family,
+        }));
+      } catch (_) {
+        // 이름 저장 실패는 로그인 자체를 막지 않음
+      }
+    }
+
+    return response;
   }
 
   // ── 로그아웃 ──────────────────────────────────────────────
