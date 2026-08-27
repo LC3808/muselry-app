@@ -11,6 +11,7 @@ import '../../../core/errors/auth_required_exception.dart';
 import '../../../core/errors/duplicate_visit_exception.dart';
 import '../museum/visit_add_dialog.dart';
 import '../../widgets/museum/museum_image.dart';
+import '../../../features/nearby/widgets/nearby_places_section.dart';
 
 class MuseumDetailScreen extends ConsumerWidget {
   final String museumId;
@@ -240,6 +241,9 @@ class _DetailBody extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
+
+                // 함께 가볼 만한 곳 (한국관광공사 TourAPI)
+                NearbyPlacesSection(museum: museum),
 
                 // 액션 버튼
                 _ActionButtons(museum: museum),
