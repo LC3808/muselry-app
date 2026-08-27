@@ -1,6 +1,6 @@
 flutter_launcher_icons:
   android: "launcher_icon"
-  ios: false  # R8: ios/ 폴더 없음 — 크래시 방지
+  ios: true  # ios/ 폴더 존재 — iOS 아이콘 생성
 
   # 메인 아이콘 (iOS는 alpha 제거 필요)
   image_path: "assets/branding/app_icon.png"
