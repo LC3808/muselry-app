@@ -7,7 +7,7 @@
 ## 시작 순서
 
 1. `wiki/index.md` — 무슨 페이지가 있고 언제 읽는지 (짧은 탐색 지도)
-2. `wiki/current-status.md` — 현재 상태(branch·HEAD·릴리스·진행중)
+2. `wiki/current-status.md` — 현재 상태(branch·application code baseline·릴리스·진행중)
 3. 요청과 관련된 페이지만 읽는다. 전체를 한 번에 읽지 않는다.
 
 ## 원칙

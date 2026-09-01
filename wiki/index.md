@@ -3,7 +3,7 @@
 > 이 파일은 **짧게** 유지한다. 무슨 페이지가 있고 언제 읽는지만 적는다. 내용 서술 금지.
 
 ## 먼저 읽기
-- [current-status.md](current-status.md) — 현재 branch·HEAD·릴리스·진행중 작업 (세션 시작 시 필독)
+- [current-status.md](current-status.md) — 현재 branch·application code baseline·릴리스·진행중 작업 (세션 시작 시 필독)
 - [overview.md](overview.md) — 앱이 무엇인지, 기술 스택 요약
 
 ## 아키텍처 (필요할 때만)

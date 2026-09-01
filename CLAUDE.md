@@ -10,7 +10,7 @@
 ## 새 세션 시작 workflow (반드시 순서대로)
 
 1. **`wiki/index.md`** 를 먼저 읽는다 — 어떤 페이지가 있고 언제 읽는지 파악 (짧은 탐색 지도).
-2. **`wiki/current-status.md`** 로 현재 상태(branch·HEAD·릴리스·진행중 작업)를 확인한다.
+2. **`wiki/current-status.md`** 로 현재 상태(branch·application code baseline·릴리스·진행중 작업)를 확인한다.
 3. 현재 요청과 관련된 Wiki 페이지만 골라 찾는다.
 4. **필요한 페이지만** 읽는다. Wiki 전체를 한 번에 읽지 않는다.
 5. Wiki를 무조건 source of truth로 믿지 않는다.
