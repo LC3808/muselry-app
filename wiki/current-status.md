@@ -5,7 +5,7 @@
 > 역할 분리: **Git = 순간값(작업 시작 시 `git rev-parse HEAD`로 확인), Wiki = 장기 상태.**
 > 순간적으로 변하는 Git HEAD를 여기 고정값으로 박지 않는다.
 
-- **갱신일**: 2026-09-01
+- **갱신일**: 2026-09-02
 - **Branch**: `feature/kto-nearby-places`
 - **Application code baseline**: `2f128ab`
   - 의미: 현재 Wiki가 설명하는 실제 application/backend 코드의 기준 commit (chore(android): target API 36, 1.0.1+45).
@@ -17,7 +17,8 @@
 
 ## 릴리스 상태
 - **iOS**: 1.0.0(빌드 44) App Store 심사 제출됨(Waiting for Review). Bundle `com.muselry.muselry`.
-- **Android**: Google Play 업데이트 준비(1.0.1+45, target API 36).
+- **Android**: Google Play 1.0.1+45 / target API 36 — Production 100% 게시 확인.
+- **Android Developer Verification**: com.muselry.muselry 패키지 등록 확인(키 1개), 현재 화면상 추가 조치 없음.
 
 ## 진행 중 / 최근 작업
 - KTO "함께 가볼 만한 곳" — Museum 상세화면에 주변 관광지 표시 (Edge Function `kto-nearby-places` + `lib/features/nearby/`).

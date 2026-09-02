@@ -1,12 +1,13 @@
 # 릴리스 & 스토어 제출 (store-submission)
 
-> 원본: `Muselry_인수인계_2026-08-25_iOS제출완료.md`, `pubspec.yaml`, `android/app/build.gradle.kts`, `ios/Runner.xcodeproj`.
+> 원본: `Muselry_인수인계_2026-08-25_iOS제출완료.md`, `pubspec.yaml`, `android/app/build.gradle`, `ios/Runner.xcodeproj`.
 > 상태 값이 바뀌면 이 페이지와 `current-status.md`를 함께 갱신.
 
-## 현재 (2026-09-01)
+## 현재 (2026-09-02)
 - 앱 버전(pubspec): **1.0.1+45**.
 - **iOS**: 1.0.0(빌드 44) App Store 심사 제출됨(Waiting for Review), 승인 즉시 자동 출시 설정.
-- **Android**: Play 업데이트 준비(target API 36, 1.0.1+45).
+- **Android**: Google Play 1.0.1+45 / target API 36 — Production 100% 게시 확인.
+- **Android Developer Verification**: com.muselry.muselry 패키지 등록 확인(키 1개), 현재 화면상 추가 조치 없음.
 
 ## 플랫폼 값
 - Bundle/App ID: `com.muselry.muselry` (iOS·Android 공통).
