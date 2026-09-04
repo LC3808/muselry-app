@@ -67,28 +67,44 @@ class ReviewRepository {
 
   // ── 조회 ──────────────────────────────────────────────────────────────────
 
-  /// 단일 리뷰 조회 (R5: 알림 딥링크용)
-  Future<Review?> fetchReviewById(String reviewId) async {
-    final response = await _client
+  /// 단일 공개 리뷰 조회 (알림 딥링크용).
+  /// [blockedUserIds]에 포함된 작성자의 리뷰는 반환하지 않는다.
+  Future<Review?> fetchReviewById(
+    String reviewId, {
+    Set<String> blockedUserIds = const <String>{},
+  }) async {
+    var query = _client
         .from('reviews')
         .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('id', reviewId)
-        .eq('status', 'published')
-        .maybeSingle();
+        .eq('status', 'published');
+    if (blockedUserIds.isNotEmpty) {
+      query = query.not('user_id', 'in', '(${blockedUserIds.join(',')})');
+    }
+
+    final response = await query.maybeSingle();
     if (response == null) return null;
     return Review.fromJson(response);
   }
 
+  /// 특정 박물관의 공개 리뷰 목록.
+  /// [blockedUserIds]에 포함된 작성자의 리뷰는 조회 단계에서 제외한다.
   Future<List<Review>> fetchReviewsForMuseum(
     String museumId, {
     int limit = 20,
     int offset = 0,
+    Set<String> blockedUserIds = const <String>{},
   }) async {
-    final response = await _client
+    var query = _client
         .from('reviews')
         .select('*, profiles(nickname, avatar_url, avatar_storage_path)')
         .eq('museum_id', museumId)
-        .eq('status', 'published')
+        .eq('status', 'published');
+    if (blockedUserIds.isNotEmpty) {
+      query = query.not('user_id', 'in', '(${blockedUserIds.join(',')})');
+    }
+
+    final response = await query
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
     return (response as List).map((e) => Review.fromJson(e)).toList();
@@ -243,32 +259,41 @@ class ReviewRepository {
     required String reviewId,
     required String reason, // 'spam' | 'inappropriate' | 'fake' | 'other'
   }) async {
-    _requireUserId;
+    final userId = _requireUserId;
     await _client.from('review_reports').insert({
       'review_id': reviewId,
+      'reporter_id': userId,
       'reason': reason,
-      // reporter_id는 RLS WITH CHECK(reporter_id = auth.uid())가 처리
     });
   }
 
    // ── 커뮤니티 피드 (P0-2 픽스) ─────────────────────────────────────
 
-  /// 커뮤니티 피드: 전체 published 리뷰 목록 (작성자+박물관 조인, 페이지 단위 20건)
-  /// [page] 0부터 시작하는 페이지 번호
-  Future<List<Review>> fetchCommunityReviews({int page = 0}) async {
+  /// 커뮤니티 피드: 전체 published 리뷰 목록 (작성자+박물관 조인, 페이지 단위 20건).
+  /// [blockedUserIds]에 포함된 작성자의 리뷰는 조회 단계에서 제외한다.
+  /// [page]는 0부터 시작하는 페이지 번호다.
+  Future<List<Review>> fetchCommunityReviews({
+    int page = 0,
+    Set<String> blockedUserIds = const <String>{},
+  }) async {
     const pageSize = 20;
     final from = page * pageSize;
     final to = from + pageSize - 1;
-    final data = await _client
-      .from('reviews')
-      .select(
-        'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, visited_on, '
-        'profiles!user_id(nickname, avatar_url, avatar_storage_path), '
-        'museums!museum_id(id, name, region_1, image_url)',
-      )
-      .eq('status', 'published')
-      .order('created_at', ascending: false)
-      .range(from, to);
+    var query = _client
+        .from('reviews')
+        .select(
+          'id, museum_id, user_id, visit_id, rating, content, status, created_at, updated_at, visited_on, '
+          'profiles!user_id(nickname, avatar_url, avatar_storage_path), '
+          'museums!museum_id(id, name, region_1, image_url)',
+        )
+        .eq('status', 'published');
+    if (blockedUserIds.isNotEmpty) {
+      query = query.not('user_id', 'in', '(${blockedUserIds.join(',')})');
+    }
+
+    final data = await query
+        .order('created_at', ascending: false)
+        .range(from, to);
     return (data as List).map((e) => Review.fromJson(e)).toList();
   }
 

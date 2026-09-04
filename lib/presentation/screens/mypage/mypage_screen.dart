@@ -1335,6 +1335,12 @@ class _ActivitySection extends ConsumerWidget {
           ),
           Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
           _MenuItem(
+            icon: Icons.block_outlined,
+            label: '차단한 사용자 관리',
+            onTap: () => context.push(AppRoutes.blockedUsers),
+          ),
+          Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
+          _MenuItem(
             icon: Icons.notifications_outlined,
             label: '알림',
             onTap: () => context.push(AppRoutes.notifications),

@@ -4,6 +4,7 @@ import '../../data/repositories/review_repository.dart';
 import '../../domain/models/review.dart';
 import '../../data/repositories/review_image_repository.dart';
 import '../../domain/models/review_image.dart';
+import 'block_provider.dart';
 
 // ─── Repository Provider ────────────────────────────────────────────────────
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
@@ -16,8 +17,12 @@ final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
 final reviewsForMuseumProvider =
     FutureProvider.family.autoDispose<List<Review>, String>(
   (ref, museumId) async {
+    final blockedUserIds = await ref.watch(blockedUserIdsProvider.future);
     final repo = ref.read(reviewRepositoryProvider);
-    return repo.fetchReviewsForMuseum(museumId);
+    return repo.fetchReviewsForMuseum(
+      museumId,
+      blockedUserIds: blockedUserIds,
+    );
   },
 );
 
@@ -138,8 +143,12 @@ class MuseumReviewsNotifier
     extends FamilyAsyncNotifier<List<Review>, String> {
   @override
   Future<List<Review>> build(String arg) async {
+    final blockedUserIds = await ref.watch(blockedUserIdsProvider.future);
     final repo = ref.read(reviewRepositoryProvider);
-    return repo.fetchReviewsForMuseum(arg);
+    return repo.fetchReviewsForMuseum(
+      arg,
+      blockedUserIds: blockedUserIds,
+    );
   }
 
   /// 리뷰 작성 후 목록 앞에 추가
@@ -174,8 +183,12 @@ class MuseumReviewsNotifier
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      final blockedUserIds = await ref.read(blockedUserIdsProvider.future);
       final repo = ref.read(reviewRepositoryProvider);
-      return repo.fetchReviewsForMuseum(arg);
+      return repo.fetchReviewsForMuseum(
+        arg,
+        blockedUserIds: blockedUserIds,
+      );
     });
   }
 }
@@ -224,6 +237,8 @@ class CommunityReviewsState {
 class CommunityReviewsNotifier extends Notifier<CommunityReviewsState> {
   @override
   CommunityReviewsState build() {
+    // 차단 목록이 바뀌면 공개 피드를 현재 세션 기준으로 다시 구성한다.
+    ref.watch(blockedUserIdsProvider);
     // 초기 빌드 시 첫 페이지 로드
     Future.microtask(() => fetchInitial());
     return const CommunityReviewsState();
@@ -233,8 +248,12 @@ class CommunityReviewsNotifier extends Notifier<CommunityReviewsState> {
   Future<void> fetchInitial() async {
       state = state.copyWith(isLoading: true, error: null);
       try {
+        final blockedUserIds = await ref.read(blockedUserIdsProvider.future);
         final repo = ref.read(reviewRepositoryProvider);
-        final reviews = await repo.fetchCommunityReviews(page: 0);
+        final reviews = await repo.fetchCommunityReviews(
+          page: 0,
+          blockedUserIds: blockedUserIds,
+        );
         state = CommunityReviewsState(
           reviews: reviews,
           isLoading: false,
@@ -251,9 +270,13 @@ class CommunityReviewsNotifier extends Notifier<CommunityReviewsState> {
     if (state.isLoading || !state.hasMore) return;
     state = state.copyWith(isLoading: true);
     try {
+      final blockedUserIds = await ref.read(blockedUserIdsProvider.future);
       final repo = ref.read(reviewRepositoryProvider);
       final nextPage = state.currentPage + 1;
-      final newReviews = await repo.fetchCommunityReviews(page: nextPage);
+      final newReviews = await repo.fetchCommunityReviews(
+        page: nextPage,
+        blockedUserIds: blockedUserIds,
+      );
       state = state.copyWith(
         reviews: [...state.reviews, ...newReviews],
         isLoading: false,

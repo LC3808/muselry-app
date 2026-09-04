@@ -14,6 +14,7 @@ import '../presentation/screens/detail/museum_detail_screen.dart';
 import '../presentation/screens/mypage/bookmarks_screen.dart';
 import '../presentation/screens/mypage/mypage_map_screen.dart';
 import '../presentation/screens/mypage/mypage_screen.dart';
+import '../presentation/screens/mypage/blocked_users_screen.dart';
 import '../presentation/screens/visit/visit_history_screen.dart';
 import '../presentation/screens/review/review_screen.dart';
 import '../presentation/screens/review/my_reviews_screen.dart';
@@ -37,6 +38,7 @@ class AppRoutes {
   static const String visitHistory = '/visits';
   static const String museumReviews = '/museum/:id/reviews';
   static const String myReviews = '/my-reviews';
+  static const String blockedUsers = '/blocked-users';
   static const String mypageMap = '/mypage/map';
   static const String bookmarks = '/mypage/bookmarks';
   static const String notifications = '/notifications';
@@ -170,6 +172,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.myReviews,
         builder: (context, state) => const MyReviewsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.blockedUsers,
+        builder: (context, state) => const BlockedUsersScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,

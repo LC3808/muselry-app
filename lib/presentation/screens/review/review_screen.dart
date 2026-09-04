@@ -345,11 +345,23 @@ class ReviewScreen extends ConsumerWidget {
                               Text('신고가 접수되었습니다. 검토 후 조치하겠습니다.')),
                     );
                   }
-                } catch (e) {
+                } on PostgrestException catch (e) {
                   if (context.mounted) {
+                    final message = e.code == '23505'
+                        ? '이미 신고한 리뷰입니다.'
+                        : '신고 중 오류가 발생했습니다.';
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('신고 중 오류가 발생했습니다: $e'),
+                        content: Text(message),
+                        backgroundColor: AppTheme.errorColor,
+                      ),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('신고 중 오류가 발생했습니다.'),
                         backgroundColor: AppTheme.errorColor,
                       ),
                     );

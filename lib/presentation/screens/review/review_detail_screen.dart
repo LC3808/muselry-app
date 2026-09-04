@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/utils/nickname_utils.dart'; // §8-1
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/comment.dart';
 import '../../../domain/models/review.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/block_provider.dart';
 import '../../providers/comment_provider.dart';
 import '../../providers/review_provider.dart';
 import '../../widgets/common/user_avatar.dart';
@@ -158,6 +160,26 @@ class ReviewDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                if (!isOwner && currentUser != null)
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'report') {
+                        _showReportDialog(context, ref, review.id);
+                      } else if (value == 'block') {
+                        _showBlockConfirmDialog(context, ref, review);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'report',
+                        child: Text('리뷰 신고'),
+                      ),
+                      PopupMenuItem(
+                        value: 'block',
+                        child: Text('이 사용자 차단'),
+                      ),
+                    ],
+                  ),
               ],
             ),
             body: _ReviewDetailBody(
@@ -169,14 +191,158 @@ class ReviewDetailScreen extends ConsumerWidget {
       ),
     );
   }
+
+  void _showReportDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String reviewId,
+  ) {
+    String selectedReason = 'spam';
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('리뷰 신고'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('신고 사유를 선택해 주세요.'),
+              const SizedBox(height: 12),
+              ...[
+                ('spam', '스팸 / 광고'),
+                ('inappropriate', '부적절한 내용'),
+                ('fake', '허위 정보'),
+                ('other', '기타'),
+              ].map(
+                (reason) => RadioListTile<String>(
+                  title: Text(reason.$2),
+                  value: reason.$1,
+                  groupValue: selectedReason,
+                  onChanged: (value) =>
+                      setDialogState(() => selectedReason = value!),
+                  dense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await ref.read(reviewRepositoryProvider).reportReview(
+                        reviewId: reviewId,
+                        reason: selectedReason,
+                      );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('신고가 접수되었습니다. 검토 후 조치하겠습니다.'),
+                      ),
+                    );
+                  }
+                } on PostgrestException catch (e) {
+                  if (context.mounted) {
+                    final message = e.code == '23505'
+                        ? '이미 신고한 리뷰입니다.'
+                        : '신고 중 오류가 발생했습니다.';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(message),
+                        backgroundColor: AppTheme.errorColor,
+                      ),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('신고 중 오류가 발생했습니다.'),
+                        backgroundColor: AppTheme.errorColor,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('신고'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showBlockConfirmDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Review review,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('사용자 차단'),
+        content: const Text(
+          '이 사용자의 리뷰가 더 이상 표시되지 않습니다.\n'
+          '차단한 사용자는 마이페이지에서 관리할 수 있습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+            child: const Text('차단'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await ref.read(blockRepositoryProvider).blockUser(review.userId);
+      ref.invalidate(blockedUserIdsProvider);
+      ref.invalidate(blockedUsersProvider);
+      ref.invalidate(reviewsForMuseumProvider);
+      ref.invalidate(museumReviewsProvider);
+      ref.invalidate(communityReviewsProvider);
+      ref.invalidate(_reviewByIdProvider(review.id));
+
+      if (!context.mounted) return;
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('사용자를 차단했습니다.')),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('사용자 차단 중 오류가 발생했습니다: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
 }
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 final _reviewByIdProvider =
     FutureProvider.autoDispose.family<Review?, String>((ref, reviewId) async {
+  final blockedUserIds = await ref.watch(blockedUserIdsProvider.future);
   final repo = ref.read(reviewRepositoryProvider);
-  return repo.fetchReviewById(reviewId);
+  return repo.fetchReviewById(
+    reviewId,
+    blockedUserIds: blockedUserIds,
+  );
 });
 
 // ── Body ──────────────────────────────────────────────────────────────────────
