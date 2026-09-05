@@ -5,23 +5,25 @@
 > 역할 분리: **Git = 순간값(작업 시작 시 `git rev-parse HEAD`로 확인), Wiki = 장기 상태.**
 > 순간적으로 변하는 Git HEAD를 여기 고정값으로 박지 않는다.
 
-- **갱신일**: 2026-09-02
+- **갱신일**: 2026-09-05
 - **Branch**: `feature/kto-nearby-places`
-- **Application code baseline**: `2f128ab`
-  - 의미: 현재 Wiki가 설명하는 실제 application/backend 코드의 기준 commit (chore(android): target API 36, 1.0.1+45).
+- **Application code baseline**: `4f3b995`
+  - 의미: 현재 Wiki가 설명하는 실제 application/backend 코드의 기준 commit (UGC 모더레이션 마이그레이션; 바로 아래 `befe085` = 사용자 차단 기능). 버전 전용 tip `be21986`(pubspec build 46)은 코드 변경 아님(구분 유지).
   - Git HEAD는 순간값이며 **작업 시작 시 실제 Git에서 확인**한다. 현재 HEAD를 Wiki에 고정값으로 저장하지 않는다.
   - `lib/`·`android/`·`ios/`·`supabase/` 등 실제 구현이 바뀔 때만 갱신한다.
   - **Wiki/documentation-only commit으로는 이 baseline을 갱신하지 않는다.**
-- **앱 버전 (pubspec)**: `1.0.1+45`
+- **앱 버전 (pubspec)**: `1.0.1+46` (커밋 be21986). App Store 라이브 빌드는 1.0/빌드44.
 - **Remote**: `https://github.com/LC3808/muselry-app.git` (LC3808/muselry-app)
 
 ## 릴리스 상태
-- **iOS**: 1.0.0(빌드 44) App Store 심사 제출됨(Waiting for Review). Bundle `com.muselry.muselry`.
+- **iOS**: 1.0.0(빌드 44) App Store **심사 승인 + 정식 출시(공개) 확인** — 2026-09-04 공개(Apple lookup: version 1.0, seller Copacabana Co.). iOS 최초 정식 출시. Bundle `com.muselry.muselry`.
+- **iOS(최신 source)**: 사용자 차단/UGC 모더레이션 반영(`befe085`·`4f3b995`), pubspec build 46(`be21986`). ASC 새 빌드 **미제출** — 라이브 빌드는 44 유지, 다음 iOS 업데이트는 공모전 제출 후 결정.
+- **양대 스토어**: **Muselry Android/iOS 정식 출시 완료** (Android Play Production 1.0.1+45 / iOS App Store 1.0 빌드44). 필수 KTO·리뷰·차단 기능 라이브.
 - **Android**: Google Play 1.0.1+45 / target API 36 — Production 100% 게시 확인.
 - **Android Developer Verification**: com.muselry.muselry 패키지 등록 확인(키 1개), 현재 화면상 추가 조치 없음.
 
 ## 진행 중 / 최근 작업
-- KTO "함께 가볼 만한 곳" — Museum 상세화면에 주변 관광지 표시 (Edge Function `kto-nearby-places` + `lib/features/nearby/`).
+- KTO "함께 가볼 만한 곳" — Museum 상세화면에 주변 관광지 표시 (Edge Function `kto-nearby-places` + `lib/features/nearby/`). iOS/Android 실기기 동작 확인(서울·안동).
 
 ## 미커밋(untracked) 참고
 - 데이터 매칭 스크립트/CSV (`tourapi_*.py`, `museums.csv`, `conflicts.csv`, `matched_auto.csv` 등) — 앱 코드 아님, 일회성 데이터 작업 산출물.
@@ -31,5 +33,6 @@
 - iOS Deployment Target 13.0 → 15.0 (2027 봄 필수).
 - 회원탈퇴 RPC에 Storage 사진 삭제 추가(개인정보 완전삭제).
 - KTO Phase 1B(아동/가족), 1C(상세 "함께 가볼 만한 곳" 확장).
+- KTO Nearby 중복 제거(dedup): 상세 화면과 동일/유사 문화공간이 Nearby 결과에 재노출 가능(안동시립박물관에서 확인) → P2, 공모전 후 개선.
 
 > 세부 릴리스 규칙·참조값은 [release/store-submission.md](release/store-submission.md).
