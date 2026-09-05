@@ -25,3 +25,12 @@
 ## 2026-09-05
 - 공모전 P0 구현 단계 전환: 홈 컴팩트 개편(P0-1) + 문화행사 미등록 venue 지도 fallback(P0-2). 구현=Manus, 검수=Claude.
 - 원칙 재확인: 라이브 iOS 빌드44 무조작, 새 ASC 빌드/버전 변경/submit 없음(공모전 후 결정).
+- Home + Badge MVP v3 실기기 QA 완료.
+- Home vertical density 개선 방향 확정.
+- Badge UX를 `Dark Collection Gallery`로 확정.
+- Milestone은 서로 다른 훈장, National Museum Collection은 통일된 museum souvenir medallion으로 구분.
+- National Museum grid compact화와 collection collapse를 채택.
+- 상세 결정: `decisions/2026-09-05-badge-dark-collection-gallery.md`
+- Android local release에서 Kakao 로그인 오류를 발견. Play App Signing과 local release signing 차이에 따른 Kakao key hash 미등록 가능성이 최유력이나, 인증 설정 변경 없이 별도 진단하기로 함.
+- Badge Phase 2A 구현: BadgeScreen near-black Gallery 전환, Hero 배지함 entry, earned-only BadgeArchive, 중앙·경주·제주 National Museum medallion prototype 3종 추가. 방문 기반 unlock/UUID 매핑은 미변경.
+- 정적 검증 후 iPhone/Android 실기기 QA와 운영자 commit 승인 대기. 상세 결정: `decisions/2026-09-05-badge-archive-and-national-museum-visual-system.md`.

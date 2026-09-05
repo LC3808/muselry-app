@@ -23,6 +23,9 @@
 - **Android Developer Verification**: com.muselry.muselry 패키지 등록 확인(키 1개), 현재 화면상 추가 조치 없음.
 
 ## 진행 중 / 최근 작업
+- **Badge Phase 2A 구현 완료·실기기 QA 대기** — near-black Black Gallery, 목표판의 배지함 entry, earned-only BadgeArchive, 중앙·경주·제주 National Museum medallion prototype 3종을 추가했다. 기존 방문 기반 unlock·canonical/legacy UUID 정의는 유지한다.
+- **Home compact UI 유지** — 직전 실기기 검증 결과를 유지하며 이번 Badge Phase 2A에서는 Home을 수정하지 않는다.
+- **Android local release Kakao 로그인 별도 진단 필요** — Play App Signing과 local release signing 차이에 따른 Kakao key hash 미등록 가능성을 별도 확인하며, 현재 UI 작업에서는 인증 설정을 변경하지 않음.
 - KTO "함께 가볼 만한 곳" — Museum 상세화면에 주변 관광지 표시 (Edge Function `kto-nearby-places` + `lib/features/nearby/`). iOS/Android 실기기 동작 확인(서울·안동).
 
 ## 미커밋(untracked) 참고
