@@ -34,3 +34,10 @@
 - Android local release에서 Kakao 로그인 오류를 발견. Play App Signing과 local release signing 차이에 따른 Kakao key hash 미등록 가능성이 최유력이나, 인증 설정 변경 없이 별도 진단하기로 함.
 - Badge Phase 2A 구현: BadgeScreen near-black Gallery 전환, Hero 배지함 entry, earned-only BadgeArchive, 중앙·경주·제주 National Museum medallion prototype 3종 추가. 방문 기반 unlock/UUID 매핑은 미변경.
 - 정적 검증 후 iPhone/Android 실기기 QA와 운영자 commit 승인 대기. 상세 결정: `decisions/2026-09-05-badge-archive-and-national-museum-visual-system.md`.
+
+- App Store Connect에서 iOS App 1.0에 Version 1.0.1 / Build 46 binary가 연결된 상태를 확인.
+- Apple Guideline 2.1 대응: physical-device App Review recording 및 심사용 계정 제공, 위치 권한·외부 서비스·앱 기능·계정 삭제 경로 안내.
+- UGC 대응 검증: 사용자 차단·차단 해제·차단 사용자 리뷰 필터링·관리 화면, 리뷰 신고 RLS 및 중복 신고 UX 확인.
+- iPhone 12 Pro Max / iOS 26.6에서 Build 46 Release core flow QA 수행.
+- Android local release Kakao 로그인 오류 원인을 `Android keyHash validation failed`로 확정. Kakao Developers에 local release certificate Key Hash를 추가한 뒤 Kakao access token 획득 및 Supabase session 발급 성공을 실기기에서 재검증. Auth/Supabase 코드 변경 없음.
+- Badge/Home 릴리스 후보 앱 코드 커밋 `6dfc3d4`, 관련 Wiki 결정·상태 커밋 `12c363f` 생성.
