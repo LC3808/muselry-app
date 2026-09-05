@@ -19,6 +19,9 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final popularAsync = ref.watch(popularMuseumsProvider);
     final displayName = ref.watch(displayNameProvider);
+    final cultureLevel = ref.watch(cultureLevelProvider);
+    final displayNameWithHonorific =
+        displayName.endsWith('님') ? displayName : '$displayName 님';
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -27,7 +30,8 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => context.go(AppRoutes.mypage), // M7-A: mypage is now shell tab
+            onPressed: () =>
+                context.go(AppRoutes.mypage), // M7-A: mypage is now shell tab
           ),
         ],
       ),
@@ -43,13 +47,27 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── 인사말 배너 ──────────────────────────────────────────
-                _GreetingBanner(displayName: displayName),
+                _GreetingBanner(
+                  displayName: displayNameWithHonorific,
+                  cultureLevelTitle:
+                      cultureLevel.level == 0 ? '문화 레벨' : cultureLevel.title,
+                  onCultureLevelTap: () => context.go(AppRoutes.mypage),
+                  onCultureMapTap: () => context.push(AppRoutes.mypageMap),
+                ),
 
-                const SizedBox(height: 24), // M7-G-7: 인사말↔그리드 간격 (f3dca0d 원본값)
+                const SizedBox(height: 16),
 
-                // ── 빠른 탐색 버튼 그리드 (M7-G-1: 헤더 없이 4버튼만) ────────────
-                _QuickAccessGrid(),
-                const SizedBox(height: 32), // M7-G-7: 그리드↔인기 장소 간격 (f3dca0d 원본값)
+                // ── 탐색·추천 중심 빠른 접근 ────────────────────────────────
+                _QuickAccessGrid(
+                  onBadgeTap: () => context.push(AppRoutes.badges),
+                ),
+                const SizedBox(height: 16),
+                _CultureTripBanner(
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('문화여행 코스를 준비 중입니다.')),
+                  ),
+                ),
+                const SizedBox(height: 24),
 
                 // ── 인기 장소 섹션 ─────────────────────────────────────
                 Row(
@@ -93,8 +111,8 @@ class HomeScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 32),
-                // ── 내 주변 전시 섹션 (v0.4.0: 문화정보 OpenAPI 실시간) ────────
+                const SizedBox(height: 24),
+                // ── 내 주변 문화행사 섹션 (v0.4.0: 문화정보 OpenAPI 실시간) ──────
                 const ExhibitionSection(),
                 const SizedBox(height: 16),
               ],
@@ -110,47 +128,206 @@ class HomeScreen extends ConsumerWidget {
 
 class _GreetingBanner extends StatelessWidget {
   final String displayName;
-  const _GreetingBanner({required this.displayName});
+  final String cultureLevelTitle;
+  final VoidCallback onCultureLevelTap;
+  final VoidCallback onCultureMapTap;
+
+  const _GreetingBanner({
+    required this.displayName,
+    required this.cultureLevelTitle,
+    required this.onCultureLevelTap,
+    required this.onCultureMapTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: AppTheme.primaryColor,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '안녕하세요 👋',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 14,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '안녕하세요 👋',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '오늘은 어떤 공간을 탐험해볼까요?', // §8-2 M7-F-2
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            displayName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '오늘은 어떤 공간을 탐험해볼까요?', // §8-2 M7-F-2
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 13,
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 126,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _GreetingActionButton(
+                  icon: Icons.auto_awesome_outlined,
+                  label: cultureLevelTitle,
+                  isCultureLevel: true,
+                  onTap: onCultureLevelTap,
+                ),
+                const SizedBox(height: 6),
+                _GreetingActionButton(
+                  icon: Icons.map_outlined,
+                  label: '나의 문화 지도',
+                  onTap: onCultureMapTap,
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GreetingActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isCultureLevel;
+  final VoidCallback onTap;
+
+  const _GreetingActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isCultureLevel = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = isCultureLevel ? AppTheme.primaryColor : Colors.white;
+    final background = isCultureLevel
+        ? Colors.white.withValues(alpha: 0.93)
+        : Colors.white.withValues(alpha: 0.14);
+    final border = isCultureLevel
+        ? Colors.white.withValues(alpha: 0.76)
+        : Colors.white.withValues(alpha: 0.42);
+
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: foreground,
+        backgroundColor: background,
+        textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        side: BorderSide(color: border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+    );
+  }
+}
+
+class _CultureTripBanner extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _CultureTripBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.accentColor.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: AppTheme.accentColor.withValues(alpha: 0.42)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.32),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.route_outlined,
+                size: 20,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '이달의 문화여행 · “안동”',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    '전통과 문화가 이어지는 특별한 여행',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right,
+              color: AppTheme.primaryColor,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -418,18 +595,24 @@ class _PopularMuseumsEmpty extends StatelessWidget {
   }
 }
 
-// ─── 빠른 탐색 그리드 (M7-G-5-1: 파스텔 카드 디자인 복원) ─────────────────────────
+// ─── 빠른 접근 그리드 ───────────────────────────────────────────────────────
 
-class _QuickAccessGrid extends ConsumerWidget {
+class _QuickAccessGrid extends StatelessWidget {
+  final VoidCallback onBadgeTap;
+
+  const _QuickAccessGrid({
+    required this.onBadgeTap,
+  });
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
-      childAspectRatio: 1.6,
+      childAspectRatio: 2.45,
       children: [
         // M7-G-5-1: 하늘색 파스텔 카드 (공간 탐색)
         _QuickAccessCard(
@@ -445,14 +628,12 @@ class _QuickAccessGrid extends ConsumerWidget {
           color: const Color(0xFF27AE60),
           onTap: () => context.go(AppRoutes.map),
         ),
-        // M7-G-5-1: 오렌지 파스텔 카드 (내 방문 기록, 라우팅 /mypage 유지)
         _QuickAccessCard(
-          emoji: '📖',
-          label: '내 방문 기록',
-          color: const Color(0xFFE67E22),
-          onTap: () => context.go(AppRoutes.mypage), // M7-G-1: /records → /mypage
+          emoji: '🏅',
+          label: '배지',
+          color: AppTheme.accentColor,
+          onTap: onBadgeTap,
         ),
-        // M7-G-5-1: 보라 파스텔 카드 (커뮤니티)
         _QuickAccessCard(
           emoji: '💬',
           label: '커뮤니티',
@@ -482,7 +663,7 @@ class _QuickAccessCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
@@ -490,16 +671,19 @@ class _QuickAccessCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 24)),
+            Text(emoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(height: 5),
             Text(
               label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: color.withValues(alpha: 0.9),
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
